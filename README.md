@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ## Persistent Entropy as a Detector of Phase Transitions
 
 Code accompanying the paper "Persistent Entropy as a Detector of Phase Transitions".
@@ -85,3 +86,7 @@ If you use this code, please cite the following paper:
   author  = {Gutiérrez-del-Pozo, M. and Ruco, M. and Paluzo-Hidalgo, E.},
   year    = {2026}
 }
+=======
+# Persistent-Entropy-as-a-Detector-of-Phase-Transitions
+Code and experiments (convolutional neural networks, Kuramoto and Vicsek) for detecting dispersion–condensation phase transitions using persistent entropy.
+>>>>>>> 39defdb1f9700fe0388bd1d7d1e65071a6167871
