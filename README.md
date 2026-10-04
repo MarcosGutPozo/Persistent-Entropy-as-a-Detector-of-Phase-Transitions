@@ -23,9 +23,7 @@ Install the required dependencies using the provided `requirements.txt` file:
 ```bash
 pip install -r requirements.txt
 ```
-
-The `requirements.txt` file contains all the Python packages required to run the experiments and reproduce the results presented in the paper.
-
+`requirements.txt` contains all the Python packages required to run the experiments and reproduce the results presented in the paper.
 
 ## Repository structure
 
@@ -50,6 +48,7 @@ phase_transitions/
     ├── run_mnet.py
     ├── run_kuramoto.py
     └── run_vicsek.py
+```
 
 ## Source Code
 
