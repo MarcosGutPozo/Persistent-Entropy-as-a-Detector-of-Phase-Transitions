@@ -6,15 +6,16 @@ from src.phase_transitions.general.persistent_entropy import pe_from_distance_ma
 
 class Vicsek():
 
-    def __init__(self, L, v0, steps, dt_v, num_particles, eta_values, R_eta, r_int, eta_selected):
+    def __init__(self, L, v0, steps, dt, num_particles, eta_values, R_eta_train, R_eta_test, r_int, eta_selected):
         # Simulation parameters
         self.L = L
         self.v0 = v0
         self.steps = steps
-        self.dt_v = dt_v
+        self.dt = dt
         self.num_particles = num_particles
         self.eta_values = np.array(eta_values, dtype=float)
-        self.R_eta = R_eta
+        self.R_eta_train = R_eta_train
+        self.R_eta_test = R_eta_test
         self.r_int = r_int
         self.eta_selected = eta_selected
 
@@ -49,7 +50,7 @@ class Vicsek():
          # Compute particle velocities
         vel = np.stack([np.cos(theta_new), np.sin(theta_new)], axis=1) * self.v0
         # Update positions
-        pos_new = pos + self.dt_v * vel
+        pos_new = pos + self.dt * vel
         # Apply periodic boundary conditions
         pos_new = pos_new % self.L
         return pos_new.astype(np.float32), theta_new.astype(np.float32)
@@ -92,7 +93,7 @@ class Vicsek():
         weight0 = []
         for k, t in enumerate(idxs):
             D = self.distance_velocity(theta_ts[t])
-            dgms, weights, pe  = pe_from_distance_matrix(D, dim=0, normalize=normalize, min_persistence=min_persistence)
+            _, weights, pe  = pe_from_distance_matrix(D, dim=0, normalize=normalize, min_persistence=min_persistence)
             pe0[k]  = pe
             weight0.append(weights)
         return pe0, weight0

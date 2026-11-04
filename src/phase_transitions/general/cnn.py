@@ -45,9 +45,6 @@ def compute_cifar10_rgb_stats(root="./data"):
 def make_loaders(dataset="digits", batch_size=128, num_workers=4):
     dataset = dataset.lower()
 
-    # =====================================================================
-    # CASO 1: DIGITS (Scikit-Learn - Mantenemos un split estándar 80/20)
-    # =====================================================================
     if dataset == "digits":
         X, y = load_digits(return_X_y=True)  # (N, 64)
         X = StandardScaler().fit_transform(X)
@@ -74,9 +71,6 @@ def make_loaders(dataset="digits", batch_size=128, num_workers=4):
 
         return train_loader, test_loader, (64,), 10
 
-    # =====================================================================
-    # CASO 2: MNIST / FASHIONMNIST / CIFAR10 (Fieles al Artículo)
-    # =====================================================================
     elif dataset in ["mnist", "fashionmnist", "fmnist", "cifar10"]:
         if dataset in ["fashionmnist", "fmnist"]:
             ds = torchvision.datasets.FashionMNIST
@@ -96,10 +90,8 @@ def make_loaders(dataset="digits", batch_size=128, num_workers=4):
             ds = torchvision.datasets.CIFAR10
             name = "CIFAR10 (Color Experiment)"
 
-            # 1. Obtenemos las medias y stds de los 3 canales (listas de 3 elementos)
             rgb_means, rgb_stds = compute_cifar10_rgb_stats(root="./data")
 
-            # 2. Transformaciones de entrenamiento: Random Crop de 24x24, Flip Horizontal y Normalización RGB
             transform_train = T.Compose([
                 T.RandomCrop(24), 
                 T.RandomHorizontalFlip(p=0.5), 
@@ -107,19 +99,16 @@ def make_loaders(dataset="digits", batch_size=128, num_workers=4):
                 T.Normalize(mean=rgb_means, std=rgb_stds)
             ])
 
-            # 3. Transformaciones de test: Center Crop de 24x24 y Normalización RGB
             transform_test = T.Compose([
                 T.CenterCrop(24), 
                 T.ToTensor(), 
                 T.Normalize(mean=rgb_means, std=rgb_stds)
             ])
                                         
-            # ¡Ojo! Cambia a 3 canales (RGB) y mantiene los 24x24 píxeles del crop
             input_size = (3, 24, 24)  
 
         root = "./data"
 
-        # Cargamos pasando sus respectivas transformaciones asignadas arriba
         train_full = ds(
             root=root, train=True, download=True, transform=transform_train
         )
@@ -148,7 +137,7 @@ def make_loaders(dataset="digits", batch_size=128, num_workers=4):
         num_classes = 10
 
         print(
-            f"¡Configuración de COLOR lista! {name} -> Train: {len(train_full)} | Test: {len(test_full)}"
+            f"{name} -> Train: {len(train_full)} | Test: {len(test_full)}"
         )
 
         return train_loader, test_loader, input_size, num_classes
@@ -186,9 +175,6 @@ def run_experiment(
 
     while iteration < iterations:
 
-        # ======================
-        # obtener batch
-        # ======================
         try:
             x, y = next(data_iter)
         except StopIteration:
@@ -197,9 +183,6 @@ def run_experiment(
 
         x, y = x.to(device), y.to(device)
 
-        # ======================
-        # forward + backward
-        # ======================
         optimizer.zero_grad()
         logits = model(x)
         loss = criterion(logits, y)
@@ -224,14 +207,12 @@ def run_experiment(
 
             with torch.no_grad():
 
-             # -------- conv1 --------
                 w1 = model.conv1.weight.data.clone()
                 filters1 = w1.view(-1, 3 * 3)
 
                 filters1 = filters1 - filters1.mean(dim=1, keepdim=True)
                 filters1 = filters1 / (filters1.norm(dim=1, keepdim=True) + 1e-8)
 
-            # -------- conv2 --------
                 w2 = model.conv2.weight.data.clone()
                 filters2 = w2.view(-1, 3 * 3)
 

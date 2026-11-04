@@ -7,193 +7,435 @@ import matplotlib.pyplot as plt
 from src.phase_transitions.general.cnn import set_seed, make_loaders, run_experiment
 from src.phase_transitions.general.density_filtration import density_filtration
 from src.phase_transitions.general.persistent_entropy import persistence_weights, persistent_entropy, pe_from_point_cloud, plot_barcode
-from src.phase_transitions.general.phase_detection_algorithm import phase_detection, plot_phases
+from src.phase_transitions.general.phase_detection_algorithm import plot_solution_probabilities, plot_phase_detection, detect_solutions
 
 from src.phase_transitions.cnet.cnet import CNet
 
-# Train the CNet neural network on the CIFAR-10 dataset
-# and study the emergence of dispersed and condensed phases during the training process.
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# Define 60 different random seeds.
-# Each seed is used to initialize and train an independent CNet model.
-SEEDS = range(60)
-all_snapshots = {}
 
-# Select the CIFAR-10 dataset and create the training and test data loaders.
-# The training data are divided into batches of 124 samples.
-# The test loader is used to evaluate the network during training.
-dataset='cifar10'
-train_loader, test_loader, input_size, num_classes = make_loaders(dataset, batch_size=124, num_workers=4)
+# ==================================================
+# Experimental parameters
+# ==================================================
+
+N_REALIZATIONS = 22
+N_NETWORKS = 60
+N_ITERATIONS = 20000
+SAVE_EVERY = 100
+
+BASE_SEED = 0
+
+dataset = "cifar10"
+
+train_loader, test_loader, input_size, num_classes = make_loaders(
+    dataset,
+    batch_size=124,
+    num_workers=4
+)
+
 criterion = nn.CrossEntropyLoss()
 
-# Run the neural network with the CNet architecture for each random seed
-for seed in SEEDS:
 
-    set_seed(seed)
+# ==================================================
+# Train independent 22 realizations
+# ==================================================
 
-    # Initialize the CNet architecture.
-    # X=64, Y=32, and Z=64 define the dimensions of the CNet layers.
-    model = CNet(in_channels=input_size[0], input_size=input_size[1], X=64, Y=32, Z=64, num_classes=num_classes)
+all_realizations = []
 
-    # Use stochastic gradient descent (SGD) to optimize the network
-    # parameters during training.
-    # lr=0.01:
-    #     Learning rate controlling the size of each parameter update.
-    # momentum=0.9:
-    #     Momentum accelerates learning in consistent directions
-    #     and can help the optimization process converge more efficiently.
-    # weight_decay=1e-4:
-    #     L2 regularization that penalizes large weights and helps
-    #     reduce overfitting.
-    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4)
+for realization in range(N_REALIZATIONS):
 
-     # Train the network and store the filters, loss, and accuracy at the specified iterations
-    history = run_experiment(model, train_loader, test_loader, optimizer,
-        criterion,
-        device,
-        save_every= 100,
-        iterations= 20000)
+    print(
+        f"\n========== REALIZATION "
+        f"{realization + 1}/{N_REALIZATIONS} =========="
+    )
 
-    for i, it in enumerate(history["iteration"]):
+    all_snapshots = {}
 
-        filters_layer1 = history["filters_layer1"][i]
-        filters_layer2 = history["filters_layer2"][i]
-        loss = history["loss"][i]           
-        accuracy = history["val_acc"][i]
+    # --------------------------------------------------
+    # Train 60 independent CNet networks
+    # --------------------------------------------------
 
-        if it not in all_snapshots:
-            all_snapshots[it] = []
+    for network in range(N_NETWORKS):
 
-        # Store all relevant information for this seed and iteration
-        all_snapshots[it].append({
-            "seed": seed,
-            "filters_layer1": filters_layer1,
-            "filters_layer2": filters_layer2,
-            "loss": loss,
-            "accuracy": accuracy
-        })
+        seed = BASE_SEED + realization * N_NETWORKS + network
 
-# Create a point cloud for each layer by combining the filters from all neural networks at each training iteration
-point_cloud_layer1 = {}
+        set_seed(seed)
 
-for it in all_snapshots:
-    filters_layer1 = [snapshot["filters_layer1"] for snapshot in all_snapshots[it]]
-    
-    point_cloud_layer1[it] = torch.cat(filters_layer1, dim=0)
+        model = CNet(
+            in_channels=input_size[0],
+            input_size=input_size[1],
+            X=64,
+            Y=32,
+            Z=64,
+            num_classes=num_classes
+        )
 
-point_cloud_layer2 = {}
+        optimizer = optim.SGD(
+            model.parameters(),
+            lr=0.01,
+            momentum=0.9,
+            weight_decay=1e-4
+        )
 
-for it in all_snapshots:
-    filters_layer2 = [snapshot["filters_layer2"] for snapshot in all_snapshots[it]]
-    
-    point_cloud_layer2[it] = torch.cat(filters_layer2, dim=0)
+        history = run_experiment(
+            model,
+            train_loader,
+            test_loader,
+            optimizer,
+            criterion,
+            device,
+            save_every=SAVE_EVERY,
+            iterations=N_ITERATIONS
+        )
 
-# Compute persistence entropy and persistence diagrams from the point cloud at each training iteration.
-# Apply density filtration as a preprocessing step to retain the points
-# that are most relevant for capturing the underlying geometry of the space.
-results_layer1 = {}
+        for i, it in enumerate(history["iteration"]):
 
-for it, pc in point_cloud_layer1.items():
-    pc = pc.numpy()
+            if it not in all_snapshots:
+                all_snapshots[it] = []
 
-    pc = density_filtration(pc, k=200, p=0.14)
+            all_snapshots[it].append({
+                "seed": seed,
+                "filters_layer1": history["filters_layer1"][i],
+                "filters_layer2": history["filters_layer2"][i],
+                "loss": history["loss"][i],
+                "accuracy": history["val_acc"][i]
+            })
 
-    dgms, pes = pe_from_point_cloud(pc, dim=1, improve_time=False)
+        print(
+            f"Realization {realization + 1} | "
+            f"Network {network + 1}/{N_NETWORKS}"
+        )
 
-    results_layer1[it] = {
-        "n_points": len(pc),
-        "H1_PE": pes,
-        "dgms_H1": dgms,
+    # --------------------------------------------------
+    # Construct point clouds
+    # --------------------------------------------------
+
+    point_cloud_layer1 = {}
+    point_cloud_layer2 = {}
+
+    for it in all_snapshots:
+
+        point_cloud_layer1[it] = torch.cat(
+            [s["filters_layer1"] for s in all_snapshots[it]],
+            dim=0
+        )
+
+        point_cloud_layer2[it] = torch.cat(
+            [s["filters_layer2"] for s in all_snapshots[it]],
+            dim=0
+        )
+
+    # --------------------------------------------------
+    # Compute persistence diagrams and entropy
+    # --------------------------------------------------
+
+    results_layer1 = {}
+
+    for it, pc in point_cloud_layer1.items():
+
+        pc = pc.cpu().numpy()
+
+        pc = density_filtration(
+            pc,
+            k=200,
+            p=0.14
+        )
+
+        dgms, pes = pe_from_point_cloud(
+            pc,
+            dim=1,
+            improve_time=False
+        )
+
+        results_layer1[it] = {
+            "n_points": len(pc),
+            "H1_PE": pes,
+            "dgms_H1": dgms
+        }
+
+    results_layer2 = {}
+
+    for it, pc in point_cloud_layer2.items():
+
+        pc = pc.cpu().numpy()
+
+        pc = density_filtration(
+            pc,
+            k=15,
+            p=0.1
+        )
+
+        dgms, pes = pe_from_point_cloud(
+            pc,
+            dim=1,
+            improve_time=True
+        )
+
+        results_layer2[it] = {
+            "n_points": len(pc),
+            "H1_PE": pes,
+            "dgms_H1": dgms
+        }
+
+    # --------------------------------------------------
+    # Store the complete realization
+    # --------------------------------------------------
+
+    all_realizations.append({
+
+        "realization": realization,
+
+        "snapshots": all_snapshots,
+
+        "point_cloud_layer1": point_cloud_layer1,
+        "point_cloud_layer2": point_cloud_layer2,
+
+        "results_layer1": results_layer1,
+        "results_layer2": results_layer2
+
+    })
+
+    print(
+        f"Realization {realization + 1} completed."
+    )
+
+
+# ==================================================
+# Compute persistence weights and entropy
+# for every realization and iteration
+# ==================================================
+
+weights_layer1 = []
+entropy_layer1 = []
+
+weights_layer2 = []
+entropy_layer2 = []
+
+for realization in all_realizations:
+
+    # --------------------------------------------------
+    # Layer 1
+    # --------------------------------------------------
+
+    w1 = {
+        it: persistence_weights(
+            realization["results_layer1"][it]["dgms_H1"],
+            min_persistence=0.1
+        )
+        for it in realization["results_layer1"]
     }
 
-results_layer2 = {}
-
-for it, pc in point_cloud_layer2.items():
-    pc = pc.numpy()
-
-    pc = density_filtration(pc, k=15, p=0.1)
-
-    dgms, pes = pe_from_point_cloud(pc, dim=1, improve_time=True)
-
-    results_layer2[it] = {
-        "n_points": len(pc),
-        "H1_PE": pes,
-        "dgms_H1": dgms,
+    e1 = {
+        it: persistent_entropy(
+            realization["results_layer1"][it]["dgms_H1"],
+            min_persistence=0.1
+        )
+        for it in realization["results_layer1"]
     }
 
-# Compute persistence weights and persistence entropy at each iteration 
-# using a minimum persistence threshold of 0.13 for both layers.
+    weights_layer1.append(w1)
+    entropy_layer1.append(e1)
 
-fig, axes = plt.subplots(1, 2, figsize=(16, 5))
+    # --------------------------------------------------
+    # Layer 2
+    # --------------------------------------------------
 
-weights_layer1 = {it: persistence_weights(results_layer1[it]['dgms_H1'], min_persistence=0.13) for it in results_layer1}
-entropy_layer1 = {it: persistent_entropy(results_layer1[it]['dgms_H1'], min_persistence=0.13) for it in results_layer1} 
-iterations1 = list(entropy_layer1.keys())
-values1 = list(entropy_layer1.values())
+    w2 = {
+        it: persistence_weights(
+            realization["results_layer2"][it]["dgms_H1"],
+            min_persistence=0.13
+        )
+        for it in realization["results_layer2"]
+    }
 
-axes[0].plot(iterations1, values1, marker=None, color='royalblue')
-axes[0].set_title(r"CIFAR-10 C(64,32,64) - Layer 1: Evolution of entropy with a 0.13 lifetime threshold")
-axes[0].set_xlabel("Iteration (I)")
-axes[0].set_ylabel("PE(H1)(I)")
-axes[0].grid(False)
+    e2 = {
+        it: persistent_entropy(
+            realization["results_layer2"][it]["dgms_H1"],
+            min_persistence=0.13
+        )
+        for it in realization["results_layer2"]
+    }
 
-weights_layer2 = {it: persistence_weights(results_layer2[it]['dgms_H1'], min_persistence=0.13) for it in results_layer2}
-entropy_layer2 = {it: persistent_entropy(results_layer2[it]['dgms_H1'], min_persistence=0.13) for it in results_layer2} 
-iterations2 = list(entropy_layer2.keys())
-values2 = list(entropy_layer2.values())
+    weights_layer2.append(w2)
+    entropy_layer2.append(e2)
 
-axes[1].plot(iterations2, values2, marker=None, color='royalblue')
-axes[1].set_title(r"CIFAR-10 C(64,32,64) - Layer 2: Evolution of entropy with a 0.13 lifetime threshold")
-axes[1].set_xlabel("Iteration (I)")
-axes[1].set_ylabel("PE(H1)(I)")
-axes[1].grid(False)
+
+# ==================================================
+# Construct arrays: (realizations, iterations)
+# ==================================================
+
+iterations = np.array(
+    sorted(weights_layer1[0].keys())
+)
+
+R = len(all_realizations)
+N = len(iterations)
+
+all_weights_layer1 = np.empty(
+    (R, N),
+    dtype=object
+)
+
+all_weights_layer2 = np.empty(
+    (R, N),
+    dtype=object
+)
+
+all_entropy_layer1 = np.zeros((R, N))
+all_entropy_layer2 = np.zeros((R, N))
+
+
+for r in range(R):
+
+    for j, it in enumerate(iterations):
+
+        all_weights_layer1[r, j] = weights_layer1[r][it]
+        all_weights_layer2[r, j] = weights_layer2[r][it]
+
+        all_entropy_layer1[r, j] = entropy_layer1[r][it]
+        all_entropy_layer2[r, j] = entropy_layer2[r][it]
+
+
+# ==================================================
+# Phase detection
+# ==================================================
+
+best_solutions_layer1 = detect_solutions(
+    all_weights_layer1,
+    delta=0.15,
+    alpha=0.05,
+    kmax=2
+)
+
+best_solutions_layer2 = detect_solutions(
+    all_weights_layer2,
+    delta=0.15,
+    alpha=0.05,
+    kmax=4
+)
+
+
+# ==================================================
+# Plot solution probabilities
+# ==================================================
+
+plot_solution_probabilities(
+    all_weights_layer1,
+    best_solutions_layer1,
+    delta=0.15,
+    alpha=0.05,
+    param_values=iterations,
+    param_symbol="I",
+    filename="cifar10_layer1_robustness"
+)
+
+plot_solution_probabilities(
+    all_weights_layer2,
+    best_solutions_layer2,
+    delta=0.15,
+    alpha=0.05,
+    param_values=iterations,
+    param_symbol="I",
+    filename="cifar10_layer2_robustness"
+)
+
+
+# ==================================================
+# Plot phase detection
+# ==================================================
+
+plot_phase_detection(
+    all_weights_layer1,
+    best_solutions_layer1[0],
+    delta=0.15,
+    alpha=0.05,
+    entropies=all_entropy_layer1,
+    param_values=iterations,
+    param_symbol="I",
+    delta_values=(0.20, 0.25, 0.30),
+    ylabel=r"PE($H_1$)",
+    filename="cifar10_layer1_phase_detection"
+)
+
+plot_phase_detection(
+    all_weights_layer2,
+    best_solutions_layer2[0],
+    delta=0.15,
+    alpha=0.05,
+    entropies=all_entropy_layer2,
+    param_values=iterations,
+    param_symbol="I",
+    delta_values=(0.20, 0.25, 0.30),
+    ylabel=r"PE($H_1$)",
+    filename="cifar10_layer2_phase_detection"
+)
+
+
+# ==================================================
+# H1 barcodes: one realization, selected iterations
+# ==================================================
+
+REALIZATION = 0
+
+BARCODE_ITERATIONS = [
+    100,
+    5000,
+    10000,
+    20000
+]
+
+fig, axes = plt.subplots(
+    len(BARCODE_ITERATIONS),
+    2,
+    figsize=(16, 18)
+)
+
+for i, it in enumerate(BARCODE_ITERATIONS):
+
+    # --------------------------------------------------
+    # Layer 1: H1
+    # --------------------------------------------------
+
+    dgm1 = all_realizations[REALIZATION][
+        "results_layer1"
+    ][it]["dgms_H1"][1]
+
+    plot_barcode(
+        dgm1,
+        axes[i, 0],
+        title=f"Layer 1 - H1 (iteration {it})",
+        show_xlabel=(i == len(BARCODE_ITERATIONS) - 1),
+        show_ylabel=True
+    )
+
+    # --------------------------------------------------
+    # Layer 2: H1
+    # --------------------------------------------------
+
+    dgm2 = all_realizations[REALIZATION][
+        "results_layer2"
+    ][it]["dgms_H1"][1]
+
+    plot_barcode(
+        dgm2,
+        axes[i, 1],
+        title=f"Layer 2 - H1 (iteration {it})",
+        show_xlabel=(i == len(BARCODE_ITERATIONS) - 1),
+        show_ylabel=False
+    )
+
+    for col in [0, 1]:
+        axes[i, col].set_xlim(0, 2)
+        axes[i, col].set_xticks(
+            np.linspace(0, 2, 5)
+        )
 
 plt.tight_layout()
+
+plt.savefig(
+    "cifar10_barcodes.pdf",
+    bbox_inches="tight"
+)
+
 plt.show()
-
-# Plot the persistence barcodes for selected training iterations for both layers
-fig, axes = plt.subplots(8, 2, figsize=(16, 12))
-
-lista = [100, 500, 1000, 3000, 5000, 10000, 15000, 20000]
-
-for row, idx in enumerate(lista):
-    
-    plot_barcode(
-        results_layer1[idx]['dgms_H1'],
-        ax=axes[row, 0],
-        title=f'CIFAR-10 C(64,32,64) Layer 1: H1 barcode (Iteration={idx})'
-    )
-    
-    plot_barcode(
-        results_layer2[idx]['dgms_H1'],
-        ax=axes[row, 1],
-        title=f'CIFAR-10 C(64,32,64) Layer 2: H1 barcode (Iteration={idx})'
-    )
-    
-    for col in [0, 1]:
-        axes[row, col].set_xlim(0, 2)
-        axes[row, col].set_xticks(np.linspace(0, 2, 5))
-        # CAMBIO AQUÍ: Ahora dice "bar_index" en el eje vertical
-        axes[row, col].set_ylabel("bar_index")
-
-plt.tight_layout(rect=[0, 0, 1, 0.93])
-plt.show()
-
-# Apply the phase detection algorithm to identify the dispersed and condensed
-# phases and determine their optimal parameters.
-best_c1, best_m1, best_k1, _, _, _, results_distrib1, results_m1, results_M1 = phase_detection(experiment='cnn', k_max=3, percent_disp=0.02, percent_cond=0, point_cloud=results_layer1, min_persistence=0.13)
-best_c2, best_m2, best_k2, _, _, _, results_distrib2, results_m2, results_M2 = phase_detection(experiment='cnn', k_max=3, percent_disp=0.01, percent_cond=0, point_cloud=results_layer2, min_persistence=0.13)
-
-items1 = sorted(entropy_layer1.items())
-iterations1 = np.array([k for k, _ in items1])
-values1 = np.array([v for _, v in items1])
-
-items2 = sorted(entropy_layer2.items())
-iterations2 = np.array([k for k, _ in items2])
-values2 = np.array([v for _, v in items2])
-
-# Plot the detected training phases for both layers.
-plot_phases(best_c1, best_k1, best_m1, results_distrib1, results_m1, results_M1, values1, iterations1, experiment = 'CIFAR-10 C(64,32,64) - Layer 1', dim='1')
-plot_phases(best_c2, best_k2, best_m2, results_distrib2, results_m2, results_M2, values2, iterations2, experiment = 'CIFAR-10 C(64,32,64) - Layer 2', dim='1')

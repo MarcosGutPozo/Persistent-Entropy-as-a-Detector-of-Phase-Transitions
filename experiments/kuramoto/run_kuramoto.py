@@ -1,13 +1,21 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-
 from src.phase_transitions.kuramoto.kuramoto import Kuramoto
-from src.phase_transitions.general.persistent_entropy import pe_from_distance_matrix, plot_barcode
-from src.phase_transitions.general.phase_detection_algorithm import phase_detection, plot_phases
-from src.phase_transitions.general.plot_mean_std_curves import plot_mean_std_curves
+from src.phase_transitions.general.persistent_entropy import (
+    pe_from_distance_matrix,
+    plot_barcode
+)
+from src.phase_transitions.general.phase_detection_algorithm import (
+    detect_solutions,
+    plot_solution_probabilities,
+    plot_phase_detection
+)
+from src.phase_transitions.general.plot_mean_std_curves import (
+    plot_mean_std_curves
+)
 
-# Fix the random seed to ensure reproducibility of the simulations.
+
 np.random.seed(42)
 
 
@@ -15,281 +23,300 @@ np.random.seed(42)
 # PARAMETERS
 # ============================================================
 
-# Number of oscillators in the Kuramoto network.
 N = 50
-
-# Initial and final simulation times.
 t0 = 0.0
 t1 = 10.0
-
-# Number of time steps used to discretize the simulation.
 steps = 500
+K_values = np.arange(0.0, 15.0 + 1e-9, 0.1)
+K_selected = [0.0, 1.0, 3.0, 5.0, 10.0, 15.0]
+R_K_train = 100
+R_K_test = 100
+delta = 0.3
+alpha = 0.05
 
-# Range of coupling strengths K explored in the experiment.
-# The coupling strength controls the interaction between oscillators
-# and therefore the degree of synchronization in the system.
-K_values = np.arange(
-    0.0,
-    16.0 + 1e-9,
-    0.5
-)
-
-# Selected coupling strengths used for visualization.
-requested_K = [
-    0.0,
-    1.0,
-    3.0,
-    5.0,
-    10.0,
-    15.0
-]
-
-# Number of independent realizations performed for each value of K.
-R_K = 10
-
-# Coupling strength used for the detailed topological analysis
-# and phase detection.
-K_selected = 10
 
 # ============================================================
 # MODEL
 # ============================================================
 
-# Initialize the Kuramoto model with the parameters defined above.
 model = Kuramoto(
     N=N,
     t0=t0,
     t1=t1,
     steps=steps,
     K_values=K_values,
-    R_k=R_K,
+    R_K_train=R_K_train,
+    R_K_test=R_K_test,
     K_selected=K_selected
 )
 
+kuramoto_time = model.t0 + np.arange(model.steps) * model.dt
 
-# Display the main parameters of the Kuramoto model.
-print("Kuramoto model")
-print("----------------")
-print(f"N       = {model.N}")
-print(f"t0      = {model.t0}")
-print(f"t1      = {model.t1}")
-print(f"steps   = {model.steps}")
-print(f"dt      = {model.dt}")
-print(f"R_K     = {model.R_k}")
-print(f"K values = {model.K_values}")
+
+# Indices of selected K values within K_values
+selected_indices = [
+    np.where(np.isclose(model.K_values, K))[0][0]
+    for K in model.K_selected
+]
+
 
 # ============================================================
-# SIMULATIONS
+# 1. TRAINING SIMULATIONS
 # ============================================================
 
-# Dictionaries used to store the synchronization parameter r(t)
-# and the persistence entropy PE(H0)(t) for each coupling strength K.
-kuramoto_r = {}
-kuramoto_pe = {}
+# Store temporal curves only for selected K values.
+kuramoto_r = {
+    float(k): np.empty((R_K_train, steps), dtype=np.float32)
+    for k in K_selected
+}
 
-# Construct the time vector corresponding to the simulation steps.
-kuramoto_time = (
-    model.t0
-    + np.arange(model.steps) * model.dt
+kuramoto_pe = {
+    float(k): np.empty((R_K_train, steps), dtype=np.float32)
+    for k in K_selected
+}
+
+# Store theta for all K values.
+theta_values = np.empty(
+    (R_K_train, len(model.K_values)),
+    dtype=object
 )
 
 
-# Perform a parameter sweep over the different coupling strengths K.
-# For each K, several independent realizations are simulated in order
-# to characterize the average behavior and its variability.
-for K in tqdm(
-    model.K_values,
-    desc="Kuramoto sweep"
-):
+for r in range(R_K_train):
 
-    all_r = []
-    all_pe = []
+    G = model.random_adjacency()
+    omega0, theta0 = model.sample_kuramoto_initial()
 
-    # Perform multiple independent realizations for each value of K.
-    for realization in range(model.R_k):
+    for j, k in enumerate(
+        tqdm(model.K_values, desc=f"Training {r+1}/{R_K_train}")
+    ):
 
-        # ----------------------------------------------------
-        # 1. Generate network
-        # ----------------------------------------------------
-
-        # Generate a random adjacency matrix defining the interaction
-        # network between the oscillators.
-        G = model.random_adjacency()
-
-
-        # ----------------------------------------------------
-        # 2. Initial conditions
-        # ----------------------------------------------------
-
-        # Sample the initial natural frequencies and phases
-        # of the oscillators.
-        omega0, theta0 = model.sample_kuramoto_initial()
-
-
-        # ----------------------------------------------------
-        # 3. Simulate Kuramoto
-        # ----------------------------------------------------
-
-        # Simulate the temporal evolution of the oscillator phases
-        # and compute the synchronization order parameter r(t).
         theta_ts, r_ts = model.simulate_kuramoto(
             G=G,
             omega0=omega0,
             theta0=theta0,
-            K=float(K)
+            K=float(k)
         )
 
+        theta_values[r, j] = theta_ts
 
-        # ----------------------------------------------------
-        # 4. Store r(t)
-        # ----------------------------------------------------
+        # Calculate temporal quantities only for selected K.
+        if j in selected_indices:
 
-        # Store the synchronization parameter for this realization.
-        all_r.append(r_ts)
+            kuramoto_r[float(k)][r, :] = r_ts
 
+            pe0, _ = model.kuramoto_pe_h0_series(
+                theta_ts,
+                normalize=False
+            )
 
-        # ----------------------------------------------------
-        # 5. Compute PE(H0)(t)
-        # ----------------------------------------------------
-
-        # Compute the temporal evolution of the persistence entropy associated with H0.
-        pe0, _ = model.kuramoto_pe_h0_series(
-            theta_ts,
-            normalize=False
-        )
-
-        all_pe.append(pe0)
+            kuramoto_pe[float(k)][r, :] = pe0
 
 
-    # --------------------------------------------------------
-    # Store all realizations for this K
-    # --------------------------------------------------------
-
-    kuramoto_r[float(K)] = np.stack(
-        all_r,
-        axis=0
-    )
-
-    kuramoto_pe[float(K)] = np.stack(
-        all_pe,
-        axis=0
-    ) 
-
-# ============================================================
-# PLOT PE(H0)
-# ============================================================
-
-K_subset = [float(K) for K in requested_K if float(K) in kuramoto_pe]
-
+# Temporal plots
 plot_mean_std_curves(
-    kuramoto_time,
-    kuramoto_pe,
-    K_subset,
-    title=(
-        "Kuramoto: mean PE(H0)(t) "
-        "± std across realizations"
-    ),
-    ylabel="PE(H0)"
+    x=kuramoto_time,
+    data_left=kuramoto_r,
+    data_right=kuramoto_pe,
+    params=model.K_selected,
+    left_ylabel=r"$r(t)$",
+    right_ylabel=r"PE($H_0$)",
+    param_label="K",
+    xlabel="Time",
+    filename="kuramoto_r_pe.pdf"
 )
 
 
 # ============================================================
-# PLOT r(t)
+# 2. TRAINING WEIGHTS
 # ============================================================
 
-K_subset = [float(K) for K in requested_K if float(K) in kuramoto_r]
-
-plot_mean_std_curves(
-    kuramoto_time,
-    kuramoto_r,
-    K_subset,
-    title=(
-        "Kuramoto: mean r(t) "
-        "± std across realizations"
-    ),
-    ylabel="r(t)"
+all_weights_training = np.empty(
+    (R_K_train, len(model.K_values)),
+    dtype=object
 )
 
+for r in range(R_K_train):
+
+    for j in range(len(model.K_values)):
+
+        theta = theta_values[r, j][-1]
+
+        D = model.synchrony_distance_from_theta(theta)
+
+        _, weight, _ = pe_from_distance_matrix(
+            D,
+            dim=0,
+            min_persistence=0.01
+        )
+
+        all_weights_training[r, j] = weight
+
+
 # ============================================================
-# DETAILED TOPOLOGICAL ANALYSIS
+# 3. TEST SIMULATIONS AND WEIGHTS
 # ============================================================
 
-# Generate one independent realization of the Kuramoto network
-# at the selected coupling strength K_selected.
+theta_values_test = np.empty(
+    (R_K_test, len(model.K_values)),
+    dtype=object
+)
 
-G = model.random_adjacency()
-omega0, theta0 = model.sample_kuramoto_initial()
+all_weights_test = np.empty(
+    (R_K_test, len(model.K_values)),
+    dtype=object
+)
 
-# Simulate the selected realization to obtain the temporal evolution
-# of the oscillator phases and the synchronization parameter.
-theta_ts, r_ts = model.simulate_kuramoto(G, omega0, theta0, float(K_selected))
+entropy_test = np.empty(
+    (R_K_test, len(model.K_values)),
+    dtype=object
+)
 
-# Compute the temporal evolution of the H0 persistence entropy
-# and the corresponding persistence weights.
-#
-# A minimum persistence threshold of 0.01 is used to remove
-# short-lived topological features and focus on the most relevant
-# structures.
-pe0, weight0 = model.kuramoto_pe_h0_series(theta_ts, normalize=False, min_persistence=0.01)
 
-pe = np.array(pe0)
+for r in range(R_K_test):
 
-# Plot the temporal evolution of persistence entropy
-# for the selected realization.
-plt.plot(kuramoto_time, pe)
-plt.title(fr"Kuramoto: Temporal evolution of entropy for a realization with $K={K_selected}$")
-plt.xlabel("Time")
-plt.ylabel(r"$PE(H_0)(t)$")
-plt.xlim(model.t0, model.t1)
-plt.show()
+    G = model.random_adjacency()
+    omega0, theta0 = model.sample_kuramoto_initial()
 
-# Select representative time points at which the H0 and H1
-# persistence barcodes will be visualized.
-fig, axes = plt.subplots(4, 2, figsize=(12, 12))
-t_list=[0,25,60,200]
-for row, ti in enumerate(t_list):
-    theta_i = theta_ts[ti]
-    D = model.synchrony_distance_from_theta(theta_i)
-    dgms_H0, _ , _ = pe_from_distance_matrix(D, dim=0)
-    dgms_H1, _ , _ = pe_from_distance_matrix(D, dim=1)
-    
-    ax0 = axes[row, 0]
+    for j, k in enumerate(
+        tqdm(model.K_values, desc=f"Test {r+1}/{R_K_test}")
+    ):
+
+        theta_ts, _ = model.simulate_kuramoto(
+            G=G,
+            omega0=omega0,
+            theta0=theta0,
+            K=float(k)
+        )
+
+        theta_values_test[r, j] = theta_ts
+
+        D = model.synchrony_distance_from_theta(theta_ts[-1])
+
+        _, weight, pe = pe_from_distance_matrix(
+            D,
+            dim=0,
+            min_persistence=0.01
+        )
+
+        all_weights_test[r, j] = weight
+        entropy_test[r, j] = pe
+
+
+# ============================================================
+# 4. PHASE DETECTION
+# ============================================================
+
+best_solutions = detect_solutions(
+    all_weights_training,
+    delta=delta,
+    alpha=alpha,
+    kmax=2
+)
+
+
+plot_solution_probabilities(
+    all_weights_test,
+    best_solutions,
+    delta=delta,
+    alpha=alpha,
+    param_values=model.K_values,
+    param_symbol="K",
+    filename="kuramoto_robustness"
+)
+
+
+plot_phase_detection(
+    all_weights_test,
+    best_solutions[0],
+    delta=delta,
+    alpha=alpha,
+    entropies=entropy_test,
+    param_values=model.K_values,
+    param_symbol="K",
+    delta_values=(0.35, 0.40, 0.45),
+    ylabel=r"PE($H_0$)",
+    filename="kuramoto_phase_detection"
+)
+
+
+# ============================================================
+# 5. BARCODE VISUALIZATION
+# ============================================================
+
+K_barcode = [0.0, 5.0, 15.0]
+
+rep_barcode = 0
+t_barcode = -1
+
+fig, axes = plt.subplots(
+    3,
+    2,
+    figsize=(10.2, 6.0),
+    sharex=False
+)
+
+for row, K in enumerate(K_barcode):
+
+    j = np.where(np.isclose(model.K_values, K))[0][0]
+
+    theta = theta_values[rep_barcode, j][t_barcode]
+
+    D = model.synchrony_distance_from_theta(theta)
+
+    dgms, _, _ = pe_from_distance_matrix(D, dim=1)
+
+    dgms[0] = np.asarray(dgms[0], dtype=float).copy()
+    dgms[0][np.isinf(dgms[0][:, 1]), 1] = np.max(D)
 
     plot_barcode(
-        dgms_H0,
-        ax=ax0,
-        title=f"Kuramoto H0 barcode (t={ti*model.dt})"
+        dgms[0],
+        ax=axes[row, 0],
+        title=rf"$K = {K:g}$",
+        show_xlabel=(row == 2),
+        show_ylabel=True,
+        xlim=(0, 0.03)
     )
-
-    ax0.set_xlim(0, 0.03)
-    ax0.set_xticks(np.linspace(0, 0.03, 6))
-
-    ax1 = axes[row, 1]
 
     plot_barcode(
-        dgms_H1,
-        ax=ax1,
-        title=f"Kuramoto H1 barcode (t={ti*model.dt})"
+        dgms[1],
+        ax=axes[row, 1],
+        title=rf"$K = {K:g}$",
+        show_xlabel=(row == 2),
+        show_ylabel=False,
+        xlim=(0, 0.5)
     )
 
-    ax1.set_xlim(0, 0.5)
-    ax1.set_xticks(np.linspace(0, 0.5, 6))
+fig.text(
+    0.285, 0.94,
+    r"$H_0$ barcode",
+    ha="center",
+    va="bottom",
+    fontsize=10
+)
 
-plt.tight_layout()
+fig.text(
+    0.765, 0.94,
+    r"$H_1$ barcode",
+    ha="center",
+    va="bottom",
+    fontsize=10
+)
+
+fig.subplots_adjust(
+    left=0.09,
+    right=0.98,
+    bottom=0.09,
+    top=0.88,
+    hspace=0.55,
+    wspace=0.25
+)
+
+plt.savefig(
+    "kuramoto_barcodes.pdf",
+    format="pdf",
+    bbox_inches="tight"
+)
+
 plt.show()
-
-# ============================================================
-# PHASE DETECTION
-# ============================================================
-
-# Apply the phase detection algorithm to the persistence weights
-# in order to identify the different dynamical phases of the
-# Kuramoto system and determine the optimal parameters for their
-# separation.
-best_c, best_m, best_k, _, _, _, results_distrib, results_m, results_M = phase_detection(weight0, k_max=1, percent_disp=0.1, percent_cond=0)
-
-# Plot the persistence entropy together with the phases
-# detected by the phase detection algorithm.
-plot_phases(best_c, best_k, best_m, results_distrib, results_m, results_M, pe, kuramoto_time, experiment = 'Kuramoto', dim='0')
-
-
+plt.close(fig)

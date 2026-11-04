@@ -1,97 +1,211 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+
+# ---------------------------------------------------------
+# Global plotting style
+# ---------------------------------------------------------
+plt.rcParams.update({
+    "font.size": 10,
+    "axes.labelsize": 10,
+    "axes.titlesize": 10,
+    "legend.fontsize": 10,
+    "xtick.labelsize": 10,
+    "ytick.labelsize": 10,
+    "lines.linewidth": 1.5,
+    "pdf.fonttype": 42,
+    "ps.fonttype": 42
+})
+
+
+# ---------------------------------------------------------
+# General comparison plotting function
+# ---------------------------------------------------------
 def plot_mean_std_curves(
     x,
-    curves_by_param,
+    data_left,
+    data_right,
     params,
-    title,
-    ylabel
+    left_ylabel,
+    right_ylabel,
+    param_label,
+    xlabel="Time",
+    filename="comparison.pdf"
 ):
 
     n = len(params)
 
-    ncols = 2
-    nrows = int(
-        np.ceil(n / ncols)
-    )
+    ncols_block = 2
+    nrows = int(np.ceil(n / ncols_block))
 
     fig, axes = plt.subplots(
         nrows,
-        ncols,
-        figsize=(12, 3.5 * nrows),
-        sharex=True,
-        sharey=True
+        4,
+        figsize=(16, 2.2 * nrows),
+        sharex=True
     )
 
-    axes = np.asarray(
-        axes
-    ).reshape(-1)
+    axes = np.asarray(axes).reshape(nrows, 4)
 
+    # -----------------------------------------------------
+    # Plot each parameter
+    # -----------------------------------------------------
 
-    for ax, eta in zip(
-        axes,
-        params
-    ):
+    for i, param in enumerate(params):
 
-        mat = curves_by_param[
-            float(eta)
-        ]
+        row = i // 2
+        col = i % 2
 
-        mean = mat.mean(
-            axis=0
-        )
+        # =================================================
+        # LEFT BLOCK
+        # =================================================
 
-        std = mat.std(
-            axis=0
-        )
+        ax = axes[row, col]
 
+        mat = data_left[float(param)]
 
-        # Mean
+        mean = mat.mean(axis=0)
+        std = mat.std(axis=0)
+
         ax.plot(
             x,
             mean,
-            linewidth=2
+            color="#1f77b4"
         )
 
-
-        # Standard deviation
         ax.fill_between(
             x,
             mean - std,
             mean + std,
+            color="#1f77b4",
             alpha=0.2
         )
 
-
         ax.set_title(
-            f"eta = {eta:g}"
+            rf"${param_label} = {param:g}$",
+            fontsize=10
         )
 
         ax.set_ylabel(
-            ylabel
+            left_ylabel,
+            fontsize=10
+        )
+
+        ax.tick_params(
+            axis="both",
+            labelsize=10
         )
 
         ax.grid(
             True,
-            alpha=0.3
+            alpha=0.25
         )
 
+        # =================================================
+        # RIGHT BLOCK
+        # =================================================
 
+        ax = axes[row, col + 2]
+
+        mat = data_right[float(param)]
+
+        mean = mat.mean(axis=0)
+        std = mat.std(axis=0)
+
+        ax.plot(
+            x,
+            mean,
+            color="#1f77b4"
+        )
+
+        ax.fill_between(
+            x,
+            mean - std,
+            mean + std,
+            color="#1f77b4",
+            alpha=0.2
+        )
+
+        ax.set_title(
+            rf"${param_label} = {param:g}$",
+            fontsize=10
+        )
+
+        ax.set_ylabel(
+            right_ylabel,
+            fontsize=10
+        )
+
+        ax.tick_params(
+            axis="both",
+            labelsize=10
+        )
+
+        ax.grid(
+            True,
+            alpha=0.25
+        )
+
+    # -----------------------------------------------------
     # Hide unused axes
-    for ax in axes[n:]:
-        ax.axis("off")
+    # -----------------------------------------------------
 
+    for i in range(n, nrows * 2):
 
-    for ax in axes[:n]:
-        ax.set_xlabel("time")
+        row = i // 2
+        col = i % 2
 
+        axes[row, col].axis("off")
+        axes[row, col + 2].axis("off")
 
-    fig.suptitle(
-        title,
-        fontsize=14
+    # -----------------------------------------------------
+    # X-axis labels
+    # -----------------------------------------------------
+
+    for j in range(4):
+
+        if axes[-1, j].axison:
+            axes[-1, j].set_xlabel(
+                xlabel,
+                fontsize=10
+            )
+
+    # -----------------------------------------------------
+    # Shared y-axis within each block
+    # -----------------------------------------------------
+
+    for j in [0, 1]:
+        axes[:, j].sharey(
+            axes[0, 0]
+        )
+
+    for j in [2, 3]:
+        axes[:, j].sharey(
+            axes[0, 2]
+        )
+
+    # -----------------------------------------------------
+    # Figure layout
+    # -----------------------------------------------------
+
+    fig.subplots_adjust(
+        left=0.06,
+        right=0.98,
+        bottom=0.10,
+        top=0.96,
+        hspace=0.35,
+        wspace=0.20
     )
 
-    plt.tight_layout()
+    # -----------------------------------------------------
+    # Save
+    # -----------------------------------------------------
+
+    plt.savefig(
+        filename,
+        format="pdf",
+        bbox_inches="tight"
+    )
 
     plt.show()
+    plt.close(fig)

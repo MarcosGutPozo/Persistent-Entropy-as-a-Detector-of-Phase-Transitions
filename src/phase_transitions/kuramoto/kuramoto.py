@@ -5,14 +5,15 @@ from src.phase_transitions.general.persistent_entropy import pe_from_distance_ma
 
 class Kuramoto():
     
-    def __init__(self, N, t0, t1, steps, K_values, R_k, K_selected):
+    def __init__(self, N, t0, t1, steps, K_values, R_K_train, R_K_test, K_selected):
         # Simulation parameters
         self.N = N
         self.t0 = t0
         self.t1 = t1
         self.steps = steps
         self.K_values = np.array(K_values, dtype=float)
-        self.R_k = R_k
+        self.R_K_train = R_K_train
+        self.R_K_test = R_K_test
         self.dt = (self.t1 - self.t0) / self.steps
         self.K_selected = K_selected
 
@@ -69,7 +70,6 @@ class Kuramoto():
            _, weights, pe = pe_from_distance_matrix(D, dim=0, normalize=normalize, min_persistence=min_persistence)
            pe0[k] = pe
            weight0.append(weights)
-    
         return pe0, weight0
 
     
