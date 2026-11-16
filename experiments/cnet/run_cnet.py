@@ -16,7 +16,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 # ==================================================
-# Experimental parameters
+# Parameters
 # ==================================================
 
 N_REALIZATIONS = 22
@@ -28,14 +28,9 @@ BASE_SEED = 0
 
 dataset = "cifar10"
 
-train_loader, test_loader, input_size, num_classes = make_loaders(
-    dataset,
-    batch_size=124,
-    num_workers=4
-)
+train_loader, test_loader, input_size, num_classes = make_loaders(dataset, batch_size=124, num_workers=4)
 
 criterion = nn.CrossEntropyLoss()
-
 
 # ==================================================
 # Train independent 22 realizations
@@ -45,10 +40,7 @@ all_realizations = []
 
 for realization in range(N_REALIZATIONS):
 
-    print(
-        f"\n========== REALIZATION "
-        f"{realization + 1}/{N_REALIZATIONS} =========="
-    )
+    print(f"\n========== REALIZATION "f"{realization + 1}/{N_REALIZATIONS} ==========")
 
     all_snapshots = {}
 
@@ -102,13 +94,10 @@ for realization in range(N_REALIZATIONS):
                 "accuracy": history["val_acc"][i]
             })
 
-        print(
-            f"Realization {realization + 1} | "
-            f"Network {network + 1}/{N_NETWORKS}"
-        )
+        print(f"Realization {realization + 1} | "f"Network {network + 1}/{N_NETWORKS}")
 
     # --------------------------------------------------
-    # Construct point clouds
+    # Build point clouds joining all the networks per realization
     # --------------------------------------------------
 
     point_cloud_layer1 = {}
@@ -116,18 +105,12 @@ for realization in range(N_REALIZATIONS):
 
     for it in all_snapshots:
 
-        point_cloud_layer1[it] = torch.cat(
-            [s["filters_layer1"] for s in all_snapshots[it]],
-            dim=0
-        )
+        point_cloud_layer1[it] = torch.cat([s["filters_layer1"] for s in all_snapshots[it]], dim=0)
 
-        point_cloud_layer2[it] = torch.cat(
-            [s["filters_layer2"] for s in all_snapshots[it]],
-            dim=0
-        )
+        point_cloud_layer2[it] = torch.cat([s["filters_layer2"] for s in all_snapshots[it]], dim=0)
 
     # --------------------------------------------------
-    # Compute persistence diagrams and entropy
+    # Compute persistence diagrams and entropy with density filtration parameters applied
     # --------------------------------------------------
 
     results_layer1 = {}
@@ -179,7 +162,7 @@ for realization in range(N_REALIZATIONS):
         }
 
     # --------------------------------------------------
-    # Store the complete realization
+    # Store all the information for each realization
     # --------------------------------------------------
 
     all_realizations.append({
@@ -202,8 +185,7 @@ for realization in range(N_REALIZATIONS):
 
 
 # ==================================================
-# Compute persistence weights and entropy
-# for every realization and iteration
+# Compute persistence weights and entropy for every realization and iteration
 # ==================================================
 
 weights_layer1 = []
@@ -213,10 +195,6 @@ weights_layer2 = []
 entropy_layer2 = []
 
 for realization in all_realizations:
-
-    # --------------------------------------------------
-    # Layer 1
-    # --------------------------------------------------
 
     w1 = {
         it: persistence_weights(
@@ -236,10 +214,6 @@ for realization in all_realizations:
 
     weights_layer1.append(w1)
     entropy_layer1.append(e1)
-
-    # --------------------------------------------------
-    # Layer 2
-    # --------------------------------------------------
 
     w2 = {
         it: persistence_weights(
@@ -261,10 +235,6 @@ for realization in all_realizations:
     entropy_layer2.append(e2)
 
 
-# ==================================================
-# Construct arrays: (realizations, iterations)
-# ==================================================
-
 iterations = np.array(
     sorted(weights_layer1[0].keys())
 )
@@ -272,15 +242,8 @@ iterations = np.array(
 R = len(all_realizations)
 N = len(iterations)
 
-all_weights_layer1 = np.empty(
-    (R, N),
-    dtype=object
-)
-
-all_weights_layer2 = np.empty(
-    (R, N),
-    dtype=object
-)
+all_weights_layer1 = np.empty((R, N), dtype=object)
+all_weights_layer2 = np.empty((R, N), dtype=object)
 
 all_entropy_layer1 = np.zeros((R, N))
 all_entropy_layer2 = np.zeros((R, N))
@@ -298,7 +261,7 @@ for r in range(R):
 
 
 # ==================================================
-# Phase detection
+# Phase detection method
 # ==================================================
 
 best_solutions_layer1 = detect_solutions(
@@ -373,17 +336,12 @@ plot_phase_detection(
 
 
 # ==================================================
-# H1 barcodes: one realization, selected iterations
+# Barcodes
 # ==================================================
 
 REALIZATION = 0
 
-BARCODE_ITERATIONS = [
-    100,
-    5000,
-    10000,
-    20000
-]
+BARCODE_ITERATIONS = [100, 5000, 10000, 20000]
 
 fig, axes = plt.subplots(
     len(BARCODE_ITERATIONS),
@@ -393,13 +351,7 @@ fig, axes = plt.subplots(
 
 for i, it in enumerate(BARCODE_ITERATIONS):
 
-    # --------------------------------------------------
-    # Layer 1: H1
-    # --------------------------------------------------
-
-    dgm1 = all_realizations[REALIZATION][
-        "results_layer1"
-    ][it]["dgms_H1"][1]
+    dgm1 = all_realizations[REALIZATION]["results_layer1"][it]["dgms_H1"][1]
 
     plot_barcode(
         dgm1,
@@ -409,13 +361,7 @@ for i, it in enumerate(BARCODE_ITERATIONS):
         show_ylabel=True
     )
 
-    # --------------------------------------------------
-    # Layer 2: H1
-    # --------------------------------------------------
-
-    dgm2 = all_realizations[REALIZATION][
-        "results_layer2"
-    ][it]["dgms_H1"][1]
+    dgm2 = all_realizations[REALIZATION]["results_layer2"][it]["dgms_H1"][1]
 
     plot_barcode(
         dgm2,

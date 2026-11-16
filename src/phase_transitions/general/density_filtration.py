@@ -8,7 +8,6 @@ def density_filtration(point_cloud, k=200, p=0.30):
 
     distances, _ = nbrs.kneighbors(point_cloud)
 
-    # distancia al vecino número k
     rho = distances[:, k]
 
     n_keep = int(len(point_cloud)*p)

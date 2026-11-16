@@ -17,7 +17,7 @@ class CNet(nn.Module):
 
         super().__init__()
 
-        # First convolutional block
+        # First convolutional layer
         self.conv1 = nn.Conv2d(
             in_channels,
             X,
@@ -32,7 +32,7 @@ class CNet(nn.Module):
 
         self.lrn1 = nn.LocalResponseNorm(4)
 
-        # Optional second convolution
+        # Second convolutional layer
         if Y > 0:
             self.conv2 = nn.Conv2d(
                 X,
@@ -70,7 +70,7 @@ class CNet(nn.Module):
 
             flatten_dim = dummy.numel()
 
-        # Optional fully connected hidden layer
+        # Fully connected layer
         if Z > 0:
 
             self.fc1 = nn.Linear(flatten_dim, Z)

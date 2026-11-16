@@ -14,7 +14,10 @@ from src.phase_transitions.mnet.mnet import MNet
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# Experimental parameters
+# ==================================================
+# Parameters
+# ==================================================
+
 N_REALIZATIONS = 40
 N_NETWORKS = 100
 N_ITERATIONS = 2000
@@ -24,15 +27,15 @@ BASE_SEED = 0
 
 dataset = "mnist"
 
-train_loader, test_loader, input_size, num_classes = make_loaders(
-    dataset, batch_size=128, num_workers=4
-)
+train_loader, test_loader, input_size, num_classes = make_loaders(dataset, batch_size=128, num_workers=4)
 
 criterion = nn.CrossEntropyLoss()
 
-# Store all 40 independent realizations
-all_realizations = []
+# ==================================================
+# Train independent 40 realizations
+# ==================================================
 
+all_realizations = []
 
 for realization in range(N_REALIZATIONS):
 
@@ -92,7 +95,7 @@ for realization in range(N_REALIZATIONS):
         )
 
     # --------------------------------------------------
-    # Construct point clouds
+    # Build point clouds joining all the networks per realization
     # --------------------------------------------------
 
     point_cloud_layer1 = {}
@@ -149,7 +152,7 @@ for realization in range(N_REALIZATIONS):
         }
 
     # --------------------------------------------------
-    # Store the complete realization
+    # Store all the realizations
     # --------------------------------------------------
 
     all_realizations.append({
@@ -174,7 +177,6 @@ entropy_layer2 = []
 
 for realization in all_realizations:
 
-    # Layer 1
     w1 = {
         it: persistence_weights(
             realization["results_layer1"][it]["dgms_H1"],
@@ -194,7 +196,6 @@ for realization in all_realizations:
     weights_layer1.append(w1)
     entropy_layer1.append(e1)
 
-    # Layer 2
     w2 = {
         it: persistence_weights(
             realization["results_layer2"][it]["dgms_H1"],
@@ -220,11 +221,9 @@ iterations = np.array(sorted(weights_layer1[0].keys()))
 R = len(all_realizations)
 N = len(iterations)
 
-# Object arrays: (realizations, iterations)
 all_weights_layer1 = np.empty((R, N), dtype=object)
 all_weights_layer2 = np.empty((R, N), dtype=object)
 
-# Numerical arrays: (realizations, iterations)
 all_entropy_layer1 = np.zeros((R, N))
 all_entropy_layer2 = np.zeros((R, N))
 
@@ -237,6 +236,9 @@ for r in range(R):
         all_entropy_layer1[r, j] = entropy_layer1[r][it]
         all_entropy_layer2[r, j] = entropy_layer2[r][it]
 
+# ==================================================
+# Phase detection method
+# ==================================================
 
 best_solutions_layer1 = detect_solutions(
     all_weights_layer1,
@@ -300,7 +302,7 @@ plot_phase_detection(
 )
 
 # --------------------------------------------------
-# H1 barcodes: one realization, three iterations
+# Barcodes
 # --------------------------------------------------
 
 REALIZATION = 0
@@ -313,7 +315,6 @@ fig, axes = plt.subplots(
 
 for i, it in enumerate(BARCODE_ITERATIONS):
 
-    # Layer 1: H1
     dgm1 = all_realizations[REALIZATION]["results_layer1"][it]["dgms_H1"][1]
 
     plot_barcode(
@@ -324,7 +325,6 @@ for i, it in enumerate(BARCODE_ITERATIONS):
         show_ylabel=True
     )
 
-    # Layer 2: H1
     dgm2 = all_realizations[REALIZATION]["results_layer2"][it]["dgms_H1"][1]
 
     plot_barcode(

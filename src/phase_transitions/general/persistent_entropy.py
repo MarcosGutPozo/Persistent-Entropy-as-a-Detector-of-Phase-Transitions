@@ -8,17 +8,16 @@ def persistence_weights(diagram, min_persistence=None, truncate=None):
     # Converts persistence lifetimes into normalized weights.
     dgm = np.asarray(diagram).copy()
 
-    # Truncate infinite bars if requested
+    # Truncate infinite bars
     if truncate is not None:
         inf_mask = np.isinf(dgm[:, 1])
         dgm[inf_mask, 1] = truncate
 
     lifetimes = dgm[:, 1] - dgm[:, 0]
 
-    # Remove non-positive lifetimes
     lifetimes = lifetimes[lifetimes > 0]
 
-    # Optional persistence threshold
+    # Apply persistence threshold
     if min_persistence is not None:
         lifetimes = lifetimes[lifetimes > min_persistence]
 

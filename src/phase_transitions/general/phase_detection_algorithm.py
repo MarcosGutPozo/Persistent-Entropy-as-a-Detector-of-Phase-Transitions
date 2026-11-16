@@ -203,7 +203,7 @@ def _finish(fig, filename):
 
 
 # =====================================================================
-# 7. Figure 1: robustness across the best solutions
+# Robustness across the best solutions
 # =====================================================================
 def plot_solution_probabilities(all_weights_test, best_solutions, delta, alpha,
                                 param_values, param_symbol="K", filename=None):
@@ -240,7 +240,7 @@ def plot_solution_probabilities(all_weights_test, best_solutions, delta, alpha,
 
 
 # =====================================================================
-# 8. Figure 2: phase detection with the optimal solution
+# 8. Phase detection with the optimal solution
 # =====================================================================
 def plot_phase_detection(all_weights_test, solution, delta, alpha, entropies,
                          param_values, param_symbol="K",

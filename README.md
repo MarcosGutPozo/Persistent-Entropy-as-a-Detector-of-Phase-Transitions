@@ -31,58 +31,57 @@ Install the required dependencies using the provided `requirements.txt` file:
 ```bash
 pip install -r requirements.txt
 ```
-`requirements.txt` contains all the Python packages required to run the experiments and reproduce the results presented in the paper.
+
+The `requirements.txt` file contains all the Python packages required to run the experiments and reproduce the results presented in the paper.
 
 ## Repository structure
 
-```text
 phase_transitions/
 ├── README.md
 ├── requirements.txt
 ├── src/
-│   └── phase_transitions/
-│       ├── cnet.py
-│       ├── mnet.py
-│       ├── kuramoto.py
-│       ├── vicsek.py
-│       └── general/
-│           ├── cnn.py
-│           ├── density_filtration.py
-│           ├── persistent_entropy.py
-│           ├── phase_detection_algorithm.py
-│           └── plot_mean_std_curves.py
+│   ├── phase_transitions/
+│   │   ├── cnet.py
+│   │   ├── mnet.py
+        ├── kuramoto.py
+        ├── vicsek.py
+        ├── general/
+            ├── cnn.py
+            ├── density_filtration.py
+            ├── persistent_entropy.py
+            ├── phase_detection_algorithm.py
+            ├── plot_mean_std_curves.py
+
 └── experiments/
     ├── run_cnet.py
     ├── run_mnet.py
     ├── run_kuramoto.py
-    └── run_vicsek.py
-```
+    ├── run_vicsek.py
 
 ## Source Code
+src/phase_transitions/ contains the implementations used by the experiments.
 
-The `src/phase_transitions/` directory contains the implementations used throughout the experiments.
+cnet.py — Convolutional network architecture for MNIST experiment.
+mnet.py — Convolutional network architecture for CIFAR-10 experiment.
+kuramoto.py — Implementation of the Kuramoto model and related simulation utilities.
+vicsek.py — Implementation of the Vicsek model and related simulation utilities.
 
-* **`cnet.py`** — Convolutional network architecture used for the MNIST experiment.
-* **`mnet.py`** — Convolutional network architecture used for the CIFAR-10 experiment.
-* **`kuramoto.py`** — Implementation of the Kuramoto model and related simulation utilities.
-* **`vicsek.py`** — Implementation of the Vicsek model and related simulation utilities.
+The general/ directory contains the common tools used throughout the experiments:
 
-The `general/` directory contains common tools used across the experiments:
-
-* **`cnn.py`** — Utilities for training and topological analysis of convolutional networks.
-* **`density_filtration.py`** — Construction of density-based filtrations.
-* **`persistent_entropy.py`** — Computation of persistence weights and persistent entropy.
-* **`phase_detection_algorithm.py`** — Implementation of the dispersion--condensation detection procedure.
-* **`plot_mean_std_curves.py`** — Utilities for plotting means and standard deviations across realizations.
+cnn.py — Utilities for training and topological analysis of convolutional networks.
+density_filtration.py — Construction of density-based filtrations.
+persistent_entropy.py — Persistence weights and persistent entropy computations.
+phase_detection_algorithm.py — Implementation of the dispersion--condensation detection procedure.
+plot_mean_std_curves.py — Utilities for plotting mean and standard deviation across realizations.
 
 ## Experiments
 
-The `experiments/` directory contains the scripts used to run the numerical experiments reported in the paper.
+experiments/ contains the scripts used to run the numerical experiments reported in the paper:
 
-* **`run_mnet.py`** — MNIST/CNN experiment.
-* **`run_cnet.py`** — CIFAR-10/CNN experiment.
-* **`run_kuramoto.py`** — Kuramoto model experiment.
-* **`run_vicsek.py`** — Vicsek model experiment.
+run_mnet.py — MNIST/CNN experiment.
+run_cnet.py — CIFAR-10/CNN experiment.
+run_kuramoto.py — Kuramoto model experiment.
+run_vicsek.py — Vicsek model experiment.
 
 ## Citation
 
@@ -94,4 +93,3 @@ If you use this code, please cite the following paper:
   author  = {Gutiérrez-del-Pozo, M. and Ruco, M. and Paluzo-Hidalgo, E.},
   year    = {2026}
 }
-```

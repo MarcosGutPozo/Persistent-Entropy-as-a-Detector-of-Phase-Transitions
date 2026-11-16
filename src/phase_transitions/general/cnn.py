@@ -29,12 +29,12 @@ def compute_cifar10_rgb_stats(root="./data"):
         root=root,
         train=True,
         download=True,
-        transform=T.ToTensor() # Convierte a [3, 32, 32] en rango [0, 1]
+        transform=T.ToTensor()
     )
     
     # Load the complete training set
     loader = DataLoader(dataset, batch_size=50000, shuffle=False, num_workers=2)
-    imgs, _ = next(iter(loader)) # [50000, 3, 32, 32]
+    imgs, _ = next(iter(loader))
     
     # Compute mean and standard deviation for each RGB channel
     means = imgs.mean(dim=(0, 2, 3)).tolist()
@@ -46,7 +46,7 @@ def make_loaders(dataset="digits", batch_size=128, num_workers=4):
     dataset = dataset.lower()
 
     if dataset == "digits":
-        X, y = load_digits(return_X_y=True)  # (N, 64)
+        X, y = load_digits(return_X_y=True)
         X = StandardScaler().fit_transform(X)
 
         X_tr, X_te, y_tr, y_te = train_test_split(

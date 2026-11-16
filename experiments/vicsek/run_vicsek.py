@@ -2,25 +2,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from src.phase_transitions.vicsek.vicsek import Vicsek
-from src.phase_transitions.general.persistent_entropy import (
-    pe_from_distance_matrix,
-    plot_barcode
-)
-from src.phase_transitions.general.phase_detection_algorithm import (
-    detect_solutions,
-    plot_solution_probabilities,
-    plot_phase_detection
-)
-from src.phase_transitions.general.plot_mean_std_curves import (
-    plot_mean_std_curves
-)
+from src.phase_transitions.general.persistent_entropy import pe_from_distance_matrix, plot_barcode
+from src.phase_transitions.general.phase_detection_algorithm import detect_solutions, plot_solution_probabilities, plot_phase_detection
+from src.phase_transitions.general.plot_mean_std_curves import plot_mean_std_curves
 
 
 np.random.seed(42)
 
 
 # ============================================================
-# PARAMETERS
+# Paramaters
 # ============================================================
 
 L = 5.0
@@ -50,7 +41,7 @@ t_barcode = -1
 
 
 # ============================================================
-# MODEL
+# Model Vicsek
 # ============================================================
 
 model = Vicsek(
@@ -70,49 +61,25 @@ vicsek_time = np.arange(model.steps) * model.dt
 
 
 # Indices of selected eta values within eta_values
-selected_indices = [
-    np.where(np.isclose(model.eta_values, eta))[0][0]
-    for eta in model.eta_selected
-]
-
+selected_indices = [np.where(np.isclose(model.eta_values, eta))[0][0] for eta in model.eta_selected]
 
 # ============================================================
 # 1. TRAINING SIMULATIONS
 # ============================================================
 
 # Store temporal curves only for selected eta values.
-vicsek_psi = {
-    float(eta): np.empty(
-        (R_eta_train, steps),
-        dtype=np.float32
-    )
-    for eta in eta_selected
-}
+vicsek_psi = {float(eta): np.empty((model.R_eta_train, model.steps), dtype=np.float32) for eta in model.eta_selected}
 
-vicsek_pe = {
-    float(eta): np.empty(
-        (R_eta_train, steps),
-        dtype=np.float32
-    )
-    for eta in eta_selected
-}
+vicsek_pe = {float(eta): np.empty((model.R_eta_train, model.steps), dtype=np.float32) for eta in model.eta_selected}
 
 # Store theta for all eta values.
-theta_values = np.empty(
-    (R_eta_train, len(model.eta_values)),
-    dtype=object
-)
+theta_values = np.empty((model.R_eta_train, len(model.eta_values)), dtype=object)
 
+for r in range(model.R_eta_train):
 
-for r in range(R_eta_train):
+    for j, eta in enumerate(tqdm(model.eta_values, desc=f"Training {r+1}/{model.R_eta_train}")):
 
-    for j, eta in enumerate(
-        tqdm(model.eta_values, desc=f"Training {r+1}/{R_eta_train}")
-    ):
-
-        pos_ts, theta_ts, psi_ts = model.simulate_vicsek(
-            float(eta)
-        )
+        pos_ts, theta_ts, psi_ts = model.simulate_vicsek(float(eta))
 
         theta_values[r, j] = theta_ts
 
@@ -121,15 +88,11 @@ for r in range(R_eta_train):
 
             vicsek_psi[float(eta)][r, :] = psi_ts
 
-            pe0, _ = model.vicsek_pe_h0_series(
-                theta_ts,
-                min_persistence=0.01
-            )
+            pe0, _ = model.vicsek_pe_h0_series(theta_ts, min_persistence=0.01)
 
             vicsek_pe[float(eta)][r, :] = pe0
 
 
-# Temporal plots
 plot_mean_std_curves(
     x=vicsek_time,
     data_left=vicsek_psi,
@@ -144,15 +107,12 @@ plot_mean_std_curves(
 
 
 # ============================================================
-# 2. TRAINING WEIGHTS
+# Training weights
 # ============================================================
 
-all_weights_training = np.empty(
-    (R_eta_train, len(model.eta_values)),
-    dtype=object
-)
+all_weights_training = np.empty((model.R_eta_train, len(model.eta_values)), dtype=object)
 
-for r in range(R_eta_train):
+for r in range(model.R_eta_train):
 
     for j in range(len(model.eta_values)):
 
@@ -160,61 +120,40 @@ for r in range(R_eta_train):
 
         D = model.distance_velocity(theta)
 
-        _, weight, _ = pe_from_distance_matrix(
-            D,
-            dim=0,
-            min_persistence=0.01
-        )
+        _, weight, _ = pe_from_distance_matrix(D, dim=0, min_persistence=0.01)
 
         all_weights_training[r, j] = weight
 
 
 # ============================================================
-# 3. TEST SIMULATIONS AND WEIGHTS
+# Test weights
 # ============================================================
 
-theta_values_test = np.empty(
-    (R_eta_test, len(model.eta_values)),
-    dtype=object
-)
+theta_values_test = np.empty((model.R_eta_test, len(model.eta_values)), dtype=object)
 
-all_weights_test = np.empty(
-    (R_eta_test, len(model.eta_values)),
-    dtype=object
-)
+all_weights_test = np.empty((model.R_eta_test, len(model.eta_values)), dtype=object)
 
-entropy_test = np.empty(
-    (R_eta_test, len(model.eta_values)),
-    dtype=object
-)
+entropy_test = np.empty((model.R_eta_test, len(model.eta_values)))
 
+for r in range(model.R_eta_test):
 
-for r in range(R_eta_test):
+    for j, eta in enumerate(tqdm(model.eta_values, desc=f"Test {r+1}/{model.R_eta_test}")):
 
-    for j, eta in enumerate(
-        tqdm(model.eta_values, desc=f"Test {r+1}/{R_eta_test}")
-    ):
-
-        pos_ts, theta_ts, psi_ts = model.simulate_vicsek(
-            float(eta)
-        )
+        pos_ts, theta_ts, psi_ts = model.simulate_vicsek(float(eta))
 
         theta_values_test[r,j] = theta_ts
 
         D = model.distance_velocity(theta_ts[-1])
 
-        _, weight, pe = pe_from_distance_matrix(
-            D,
-            dim=0,
-            min_persistence=0.01
-        )
+        _, weight, pe = pe_from_distance_matrix(D, dim=0, min_persistence=0.01)
 
         all_weights_test[r, j] = weight
+
         entropy_test[r, j] = pe
 
 
 # ============================================================
-# 4. PHASE DETECTION
+# Phase detection
 # ============================================================
 
 best_solutions = detect_solutions(
@@ -251,7 +190,7 @@ plot_phase_detection(
 
 
 # ============================================================
-# 5. BARCODE VISUALIZATION
+# Barcodes
 # ============================================================
 
 fig, axes = plt.subplots(

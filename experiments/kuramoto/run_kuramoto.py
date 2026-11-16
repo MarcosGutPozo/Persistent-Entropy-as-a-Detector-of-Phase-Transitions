@@ -2,25 +2,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from src.phase_transitions.kuramoto.kuramoto import Kuramoto
-from src.phase_transitions.general.persistent_entropy import (
-    pe_from_distance_matrix,
-    plot_barcode
-)
-from src.phase_transitions.general.phase_detection_algorithm import (
-    detect_solutions,
-    plot_solution_probabilities,
-    plot_phase_detection
-)
-from src.phase_transitions.general.plot_mean_std_curves import (
-    plot_mean_std_curves
-)
-
+from src.phase_transitions.general.persistent_entropy import pe_from_distance_matrix, plot_barcode
+from src.phase_transitions.general.phase_detection_algorithm import detect_solutions, plot_solution_probabilities, plot_phase_detection
+from src.phase_transitions.general.plot_mean_std_curves import plot_mean_std_curves
 
 np.random.seed(42)
 
 
 # ============================================================
-# PARAMETERS
+# Parameters
 # ============================================================
 
 N = 50
@@ -36,7 +26,7 @@ alpha = 0.05
 
 
 # ============================================================
-# MODEL
+# Model Kuramoto
 # ============================================================
 
 model = Kuramoto(
@@ -52,63 +42,30 @@ model = Kuramoto(
 
 kuramoto_time = model.t0 + np.arange(model.steps) * model.dt
 
+selected_indices = [np.where(np.isclose(model.K_values, K))[0][0] for K in model.K_selected]
 
-# Indices of selected K values within K_values
-selected_indices = [
-    np.where(np.isclose(model.K_values, K))[0][0]
-    for K in model.K_selected
-]
+kuramoto_r = {float(k): np.empty((model.R_K_train, model.steps), dtype=np.float32) for k in model.K_selected}
 
+kuramoto_pe = {float(k): np.empty((model.R_K_train, model.steps), dtype=np.float32) for k in model.K_selected}
 
-# ============================================================
-# 1. TRAINING SIMULATIONS
-# ============================================================
+theta_values = np.empty((model.R_K_train, len(model.K_values)), dtype=object)
 
-# Store temporal curves only for selected K values.
-kuramoto_r = {
-    float(k): np.empty((R_K_train, steps), dtype=np.float32)
-    for k in K_selected
-}
-
-kuramoto_pe = {
-    float(k): np.empty((R_K_train, steps), dtype=np.float32)
-    for k in K_selected
-}
-
-# Store theta for all K values.
-theta_values = np.empty(
-    (R_K_train, len(model.K_values)),
-    dtype=object
-)
-
-
-for r in range(R_K_train):
+for r in range(model.R_K_train):
 
     G = model.random_adjacency()
     omega0, theta0 = model.sample_kuramoto_initial()
 
-    for j, k in enumerate(
-        tqdm(model.K_values, desc=f"Training {r+1}/{R_K_train}")
-    ):
+    for j, k in enumerate(tqdm(model.K_values, desc=f"Training {r+1}/{model.R_K_train}")):
 
-        theta_ts, r_ts = model.simulate_kuramoto(
-            G=G,
-            omega0=omega0,
-            theta0=theta0,
-            K=float(k)
-        )
+        theta_ts, r_ts = model.simulate_kuramoto(G=G, omega0=omega0, theta0=theta0, K=float(k))
 
         theta_values[r, j] = theta_ts
 
-        # Calculate temporal quantities only for selected K.
         if j in selected_indices:
 
             kuramoto_r[float(k)][r, :] = r_ts
 
-            pe0, _ = model.kuramoto_pe_h0_series(
-                theta_ts,
-                normalize=False
-            )
+            pe0, _ = model.kuramoto_pe_h0_series(theta_ts, normalize=False)
 
             kuramoto_pe[float(k)][r, :] = pe0
 
@@ -128,15 +85,12 @@ plot_mean_std_curves(
 
 
 # ============================================================
-# 2. TRAINING WEIGHTS
+# Training weights
 # ============================================================
 
-all_weights_training = np.empty(
-    (R_K_train, len(model.K_values)),
-    dtype=object
-)
+all_weights_training = np.empty((model.R_K_train, len(model.K_values)), dtype=object)
 
-for r in range(R_K_train):
+for r in range(model.R_K_train):
 
     for j in range(len(model.K_values)):
 
@@ -144,67 +98,42 @@ for r in range(R_K_train):
 
         D = model.synchrony_distance_from_theta(theta)
 
-        _, weight, _ = pe_from_distance_matrix(
-            D,
-            dim=0,
-            min_persistence=0.01
-        )
+        _, weight, _ = pe_from_distance_matrix(D, dim=0, min_persistence=0.01)
 
         all_weights_training[r, j] = weight
 
 
 # ============================================================
-# 3. TEST SIMULATIONS AND WEIGHTS
+# Test weights
 # ============================================================
 
-theta_values_test = np.empty(
-    (R_K_test, len(model.K_values)),
-    dtype=object
-)
+theta_values_test = np.empty((model.R_K_test, len(model.K_values)), dtype=object)
 
-all_weights_test = np.empty(
-    (R_K_test, len(model.K_values)),
-    dtype=object
-)
+all_weights_test = np.empty((model.R_K_test, len(model.K_values)), dtype=object)
 
-entropy_test = np.empty(
-    (R_K_test, len(model.K_values)),
-    dtype=object
-)
+entropy_test = np.zeros((model.R_K_test, len(model.K_values)))
 
-
-for r in range(R_K_test):
+for r in range(model.R_K_test):
 
     G = model.random_adjacency()
     omega0, theta0 = model.sample_kuramoto_initial()
 
-    for j, k in enumerate(
-        tqdm(model.K_values, desc=f"Test {r+1}/{R_K_test}")
-    ):
+    for j, k in enumerate(tqdm(model.K_values, desc=f"Test {r+1}/{model.R_K_test}")):
 
-        theta_ts, _ = model.simulate_kuramoto(
-            G=G,
-            omega0=omega0,
-            theta0=theta0,
-            K=float(k)
-        )
+        theta_ts, _ = model.simulate_kuramoto(G=G, omega0=omega0, theta0=theta0, K=float(k))
 
         theta_values_test[r, j] = theta_ts
 
         D = model.synchrony_distance_from_theta(theta_ts[-1])
 
-        _, weight, pe = pe_from_distance_matrix(
-            D,
-            dim=0,
-            min_persistence=0.01
-        )
+        _, weight, pe = pe_from_distance_matrix(D, dim=0, min_persistence=0.01)
 
         all_weights_test[r, j] = weight
         entropy_test[r, j] = pe
 
 
 # ============================================================
-# 4. PHASE DETECTION
+# Phase detection method
 # ============================================================
 
 best_solutions = detect_solutions(
@@ -241,7 +170,7 @@ plot_phase_detection(
 
 
 # ============================================================
-# 5. BARCODE VISUALIZATION
+# Barcodes
 # ============================================================
 
 K_barcode = [0.0, 5.0, 15.0]

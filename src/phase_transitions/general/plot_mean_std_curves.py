@@ -18,9 +18,6 @@ plt.rcParams.update({
 })
 
 
-# ---------------------------------------------------------
-# General comparison plotting function
-# ---------------------------------------------------------
 def plot_mean_std_curves(
     x,
     data_left,
@@ -47,18 +44,10 @@ def plot_mean_std_curves(
 
     axes = np.asarray(axes).reshape(nrows, 4)
 
-    # -----------------------------------------------------
-    # Plot each parameter
-    # -----------------------------------------------------
-
     for i, param in enumerate(params):
 
         row = i // 2
         col = i % 2
-
-        # =================================================
-        # LEFT BLOCK
-        # =================================================
 
         ax = axes[row, col]
 
@@ -101,10 +90,6 @@ def plot_mean_std_curves(
             alpha=0.25
         )
 
-        # =================================================
-        # RIGHT BLOCK
-        # =================================================
-
         ax = axes[row, col + 2]
 
         mat = data_right[float(param)]
@@ -146,10 +131,6 @@ def plot_mean_std_curves(
             alpha=0.25
         )
 
-    # -----------------------------------------------------
-    # Hide unused axes
-    # -----------------------------------------------------
-
     for i in range(n, nrows * 2):
 
         row = i // 2
@@ -158,10 +139,6 @@ def plot_mean_std_curves(
         axes[row, col].axis("off")
         axes[row, col + 2].axis("off")
 
-    # -----------------------------------------------------
-    # X-axis labels
-    # -----------------------------------------------------
-
     for j in range(4):
 
         if axes[-1, j].axison:
@@ -169,10 +146,6 @@ def plot_mean_std_curves(
                 xlabel,
                 fontsize=10
             )
-
-    # -----------------------------------------------------
-    # Shared y-axis within each block
-    # -----------------------------------------------------
 
     for j in [0, 1]:
         axes[:, j].sharey(
@@ -184,10 +157,6 @@ def plot_mean_std_curves(
             axes[0, 2]
         )
 
-    # -----------------------------------------------------
-    # Figure layout
-    # -----------------------------------------------------
-
     fig.subplots_adjust(
         left=0.06,
         right=0.98,
@@ -196,10 +165,6 @@ def plot_mean_std_curves(
         hspace=0.35,
         wspace=0.20
     )
-
-    # -----------------------------------------------------
-    # Save
-    # -----------------------------------------------------
 
     plt.savefig(
         filename,
