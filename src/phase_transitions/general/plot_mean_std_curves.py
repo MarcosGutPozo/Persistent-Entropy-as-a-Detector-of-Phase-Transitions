@@ -18,6 +18,9 @@ plt.rcParams.update({
 })
 
 
+# ---------------------------------------------------------
+# Mean and standard deviation comparison plots
+# ---------------------------------------------------------
 def plot_mean_std_curves(
     x,
     data_left,
@@ -31,142 +34,96 @@ def plot_mean_std_curves(
 ):
 
     n = len(params)
+    ncols = 2
+    nrows = int(np.ceil(n / ncols))
 
-    ncols_block = 2
-    nrows = int(np.ceil(n / ncols_block))
-
-    fig, axes = plt.subplots(
-        nrows,
-        4,
-        figsize=(16, 2.2 * nrows),
-        sharex=True
+    fig = plt.figure(
+        figsize=(16, 2.2 * nrows)
     )
 
-    axes = np.asarray(axes).reshape(nrows, 4)
+    subfigs = fig.subfigures(
+        1,
+        2,
+        wspace=0.03
+    )
 
-    for i, param in enumerate(params):
+    for subfig, curves_by_param, ylabel in zip(
+        subfigs,
+        [data_left, data_right],
+        [left_ylabel, right_ylabel]
+    ):
 
-        row = i // 2
-        col = i % 2
-
-        ax = axes[row, col]
-
-        mat = data_left[float(param)]
-
-        mean = mat.mean(axis=0)
-        std = mat.std(axis=0)
-
-        ax.plot(
-            x,
-            mean,
-            color="#1f77b4"
+        axes = subfig.subplots(
+            nrows,
+            ncols,
+            sharex=True,
+            sharey=True
         )
 
-        ax.fill_between(
-            x,
-            mean - std,
-            mean + std,
-            color="#1f77b4",
-            alpha=0.2
-        )
+        axes = np.asarray(axes).reshape(-1)
 
-        ax.set_title(
-            rf"${param_label} = {param:g}$",
-            fontsize=10
-        )
+        for i, (ax, param) in enumerate(zip(axes, params)):
 
-        ax.set_ylabel(
-            left_ylabel,
-            fontsize=10
-        )
+            mat = curves_by_param[float(param)]
 
-        ax.tick_params(
-            axis="both",
-            labelsize=10
-        )
+            mean = mat.mean(axis=0)
+            std = mat.std(axis=0)
 
-        ax.grid(
-            True,
-            alpha=0.25
-        )
+            ax.plot(
+                x,
+                mean,
+                color="#1f77b4"
+            )
 
-        ax = axes[row, col + 2]
+            ax.fill_between(
+                x,
+                mean - std,
+                mean + std,
+                color="#1f77b4",
+                alpha=0.2
+            )
 
-        mat = data_right[float(param)]
-
-        mean = mat.mean(axis=0)
-        std = mat.std(axis=0)
-
-        ax.plot(
-            x,
-            mean,
-            color="#1f77b4"
-        )
-
-        ax.fill_between(
-            x,
-            mean - std,
-            mean + std,
-            color="#1f77b4",
-            alpha=0.2
-        )
-
-        ax.set_title(
-            rf"${param_label} = {param:g}$",
-            fontsize=10
-        )
-
-        ax.set_ylabel(
-            right_ylabel,
-            fontsize=10
-        )
-
-        ax.tick_params(
-            axis="both",
-            labelsize=10
-        )
-
-        ax.grid(
-            True,
-            alpha=0.25
-        )
-
-    for i in range(n, nrows * 2):
-
-        row = i // 2
-        col = i % 2
-
-        axes[row, col].axis("off")
-        axes[row, col + 2].axis("off")
-
-    for j in range(4):
-
-        if axes[-1, j].axison:
-            axes[-1, j].set_xlabel(
-                xlabel,
+            ax.set_title(
+                rf"${param_label} = {param:g}$",
                 fontsize=10
             )
 
-    for j in [0, 1]:
-        axes[:, j].sharey(
-            axes[0, 0]
+            ax.set_ylabel(
+                ylabel,
+                fontsize=10
+            )
+
+            ax.tick_params(
+                axis="both",
+                labelsize=10
+            )
+
+            ax.grid(
+                True,
+                alpha=0.25
+            )
+
+            # Only show x-axis label in the last row
+            if i // ncols == nrows - 1:
+                ax.set_xlabel(
+                    xlabel,
+                    fontsize=10
+                )
+
+        # Hide unused axes
+        for ax in axes[n:]:
+            ax.axis("off")
+
+        subfig.subplots_adjust(
+            left=0.12,
+            right=0.98,
+            bottom=0.10,
+            top=0.96,
+            hspace=0.35,
+            wspace=0.20
         )
 
-    for j in [2, 3]:
-        axes[:, j].sharey(
-            axes[0, 2]
-        )
-
-    fig.subplots_adjust(
-        left=0.06,
-        right=0.98,
-        bottom=0.10,
-        top=0.96,
-        hspace=0.35,
-        wspace=0.20
-    )
-
-    plt.savefig(
+    fig.savefig(
         filename,
         format="pdf",
         bbox_inches="tight"

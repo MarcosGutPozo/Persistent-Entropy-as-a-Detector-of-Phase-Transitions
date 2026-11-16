@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from ripser import ripser
 
 
@@ -32,14 +31,15 @@ def persistence_weights(diagram, min_persistence=None, truncate=None):
 def persistent_entropy(diagram, normalize=False, min_persistence=None, truncate=None):
 
     # Calculate persistent entropy from persistence lifetimes
-    
-    weights=persistence_weights(diagram, min_persistence=min_persistence, truncate=truncate)
+
+    weights = persistence_weights(diagram, min_persistence=min_persistence, truncate=truncate)
     pe = -(weights * np.log(weights)).sum()
 
     if normalize:
         pe = pe / np.log(len(weights))
 
     return float(pe)
+
 
 def plot_barcode(
     dgm,
@@ -85,6 +85,7 @@ def plot_barcode(
     ax.tick_params(axis="both", labelsize=10)
     ax.grid(axis="y", alpha=0.25)
 
+
 def pe_from_point_cloud(point_cloud, dim=1, improve_time=False, n_perm=2000, normalize=False, min_persistence=None):
     # This function computes persistence diagrams and persistent entropy from a point cloud.
     if improve_time:
@@ -93,8 +94,9 @@ def pe_from_point_cloud(point_cloud, dim=1, improve_time=False, n_perm=2000, nor
         res = ripser(point_cloud, maxdim=dim)
 
     dgms = res["dgms"]
-    pe = persistent_entropy(dgms[dim], normalize=normalize, min_persistence=min_persistence) 
+    pe = persistent_entropy(dgms[dim], normalize=normalize, min_persistence=min_persistence)
     return dgms, pe
+
 
 def pe_from_distance_matrix(D, dim=0, normalize=False, min_persistence=None):
     # This function computes persistence diagrams, normalized weights and persistent entropy from distance matrix.
@@ -103,4 +105,4 @@ def pe_from_distance_matrix(D, dim=0, normalize=False, min_persistence=None):
     dgms = res["dgms"]
     weights = persistence_weights(dgms[dim], min_persistence=min_persistence, truncate=trunc)
     pe = persistent_entropy(dgms[dim], normalize=normalize, min_persistence=min_persistence, truncate=trunc)
-    return dgms, weights, pe  
+    return dgms, weights, pe

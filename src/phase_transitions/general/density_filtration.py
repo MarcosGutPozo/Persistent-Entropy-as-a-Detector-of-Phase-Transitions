@@ -1,6 +1,7 @@
 from sklearn.neighbors import NearestNeighbors
 import numpy as np
 
+
 def density_filtration(point_cloud, k=200, p=0.30):
 
     nbrs = NearestNeighbors(n_neighbors=k+1)

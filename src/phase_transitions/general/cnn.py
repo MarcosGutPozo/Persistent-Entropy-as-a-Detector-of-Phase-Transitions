@@ -23,6 +23,7 @@ def set_seed(seed: int):
     torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.benchmark = True
 
+
 def compute_cifar10_rgb_stats(root="./data"):
     # Load CIFAR-10 training images as tensors
     dataset = torchvision.datasets.CIFAR10(
@@ -31,16 +32,17 @@ def compute_cifar10_rgb_stats(root="./data"):
         download=True,
         transform=T.ToTensor()
     )
-    
+
     # Load the complete training set
     loader = DataLoader(dataset, batch_size=50000, shuffle=False, num_workers=2)
     imgs, _ = next(iter(loader))
-    
+
     # Compute mean and standard deviation for each RGB channel
     means = imgs.mean(dim=(0, 2, 3)).tolist()
     stds = imgs.std(dim=(0, 2, 3)).tolist()
-    
+
     return means, stds
+
 
 def make_loaders(dataset="digits", batch_size=128, num_workers=4):
     dataset = dataset.lower()
@@ -93,19 +95,19 @@ def make_loaders(dataset="digits", batch_size=128, num_workers=4):
             rgb_means, rgb_stds = compute_cifar10_rgb_stats(root="./data")
 
             transform_train = T.Compose([
-                T.RandomCrop(24), 
-                T.RandomHorizontalFlip(p=0.5), 
-                T.ToTensor(), 
+                T.RandomCrop(24),
+                T.RandomHorizontalFlip(p=0.5),
+                T.ToTensor(),
                 T.Normalize(mean=rgb_means, std=rgb_stds)
             ])
 
             transform_test = T.Compose([
-                T.CenterCrop(24), 
-                T.ToTensor(), 
+                T.CenterCrop(24),
+                T.ToTensor(),
                 T.Normalize(mean=rgb_means, std=rgb_stds)
             ])
-                                        
-            input_size = (3, 24, 24)  
+
+            input_size = (3, 24, 24)
 
         root = "./data"
 
@@ -144,7 +146,6 @@ def make_loaders(dataset="digits", batch_size=128, num_workers=4):
 
     else:
         raise ValueError(f"Unknown dataset: {dataset}")
-
 
 
 def run_experiment(
@@ -194,7 +195,7 @@ def run_experiment(
         if iteration % save_every == 0:
 
             model.eval()
-            
+
             correct, total = 0, 0
             with torch.no_grad():
                 for xb, yb in test_loader:

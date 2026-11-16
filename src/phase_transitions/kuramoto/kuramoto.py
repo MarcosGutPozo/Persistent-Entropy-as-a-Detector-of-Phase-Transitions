@@ -4,7 +4,7 @@ from src.phase_transitions.general.persistent_entropy import pe_from_distance_ma
 
 
 class Kuramoto():
-    
+
     def __init__(self, N, t0, t1, steps, K_values, R_K_train, R_K_test, K_selected):
         # Simulation parameters
         self.N = N
@@ -44,12 +44,12 @@ class Kuramoto():
         theta_ts = np.zeros((self.steps, self.N), dtype=np.float32)
         r_ts = np.zeros(self.steps, dtype=np.float32)
         for t in range(self.steps):
-           theta_ts[t] = theta
-           # Compute Kuramoto order parameter
-           c = np.sum(np.cos(theta))
-           s = np.sum(np.sin(theta))
-           r_ts[t] = np.sqrt(c*c + s*s) / self.N  # r in [0,1]
-           theta = theta + self.dt * self.kuramoto_step(theta, omega0, K, G)
+            theta_ts[t] = theta
+            # Compute Kuramoto order parameter
+            c = np.sum(np.cos(theta))
+            s = np.sum(np.sin(theta))
+            r_ts[t] = np.sqrt(c*c + s*s) / self.N  # r in [0,1]
+            theta = theta + self.dt * self.kuramoto_step(theta, omega0, K, G)
         return theta_ts, r_ts
 
     def synchrony_distance_from_theta(self, theta):
@@ -64,12 +64,10 @@ class Kuramoto():
         pe0 = np.zeros(len(idxs), dtype=np.float32)
         weight0 = []
         for k, t in enumerate(idxs):
-           # Build the synchrony distance matrix
-           D = self.synchrony_distance_from_theta(theta_ts[t])
-           # Compute persistent entropy and weights from the distance matrix
-           _, weights, pe = pe_from_distance_matrix(D, dim=0, normalize=normalize, min_persistence=min_persistence)
-           pe0[k] = pe
-           weight0.append(weights)
+            # Build the synchrony distance matrix
+            D = self.synchrony_distance_from_theta(theta_ts[t])
+            # Compute persistent entropy and weights from the distance matrix
+            _, weights, pe = pe_from_distance_matrix(D, dim=0, normalize=normalize, min_persistence=min_persistence)
+            pe0[k] = pe
+            weight0.append(weights)
         return pe0, weight0
-
-    

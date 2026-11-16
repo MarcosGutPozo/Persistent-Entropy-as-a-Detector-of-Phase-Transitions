@@ -141,7 +141,7 @@ for r in range(model.R_eta_test):
 
         pos_ts, theta_ts, psi_ts = model.simulate_vicsek(float(eta))
 
-        theta_values_test[r,j] = theta_ts
+        theta_values_test[r, j] = theta_ts
 
         D = model.distance_velocity(theta_ts[-1])
 

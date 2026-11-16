@@ -47,7 +47,7 @@ class Vicsek():
         # Add angular noise
         noise = (np.random.rand(theta.size) - 0.5) * eta
         theta_new = theta_avg + noise
-         # Compute particle velocities
+        # Compute particle velocities
         vel = np.stack([np.cos(theta_new), np.sin(theta_new)], axis=1) * self.v0
         # Update positions
         pos_new = pos + self.dt * vel
@@ -93,7 +93,7 @@ class Vicsek():
         weight0 = []
         for k, t in enumerate(idxs):
             D = self.distance_velocity(theta_ts[t])
-            _, weights, pe  = pe_from_distance_matrix(D, dim=0, normalize=normalize, min_persistence=min_persistence)
-            pe0[k]  = pe
+            _, weights, pe = pe_from_distance_matrix(D, dim=0, normalize=normalize, min_persistence=min_persistence)
+            pe0[k] = pe
             weight0.append(weights)
         return pe0, weight0

@@ -7,9 +7,6 @@ from matplotlib.patches import Patch
 from scipy.stats import beta
 
 
-# =====================================================================
-# 1. Entropy bounds
-# =====================================================================
 def g(x):
     return -x * math.log(x)
 
@@ -21,7 +18,7 @@ def Hdisp(c, m):
 
 
 def Hcond(c, k, S):
-    """Entropy upper bound in the condensed regime (three cases of Eq. 4)."""
+    """Entropy upper bound in the condensed regime."""
     kappa = k * (1 + np.exp((-g(c) - g(1 - c)) / c))
     if S < k:
         return math.log(S)
@@ -30,9 +27,6 @@ def Hcond(c, k, S):
     return -(1 - c) * math.log((1 - c) / k) - c * math.log(c / (S - k))
 
 
-# =====================================================================
-# 2. Statistics across realizations
-# =====================================================================
 def j_star(R, delta, alpha=0.05):
     """Smallest j such that the alpha-quantile of Beta(j, R-j+1) is >= 1-delta."""
     for j in range(1, R + 1):
@@ -41,9 +35,6 @@ def j_star(R, delta, alpha=0.05):
     raise ValueError(f"No j* exists for R={R}, delta={delta}, alpha={alpha}")
 
 
-# =====================================================================
-# 3. Observables on the weights (weights: object array of shape (R, N))
-# =====================================================================
 def compute_pm(m, weights):
     """m-th largest normalized weight p_m for each realization and index."""
     R, N = weights.shape
@@ -69,9 +60,6 @@ def compute_Tk(k, weights):
     return Tk
 
 
-# =====================================================================
-# 4. Solution search
-# =====================================================================
 def detect_solutions(weights, delta, alpha, kmax=5, n_best=100):
     """Return the n_best parameter sets (k, m, c_disp, c_cond, S) ranked by Gamma."""
     R, N = weights.shape
@@ -82,11 +70,8 @@ def detect_solutions(weights, delta, alpha, kmax=5, n_best=100):
 
     for k in range(1, kmax + 1):
         Tk = compute_Tk(k, weights)
-
-        # --- Condensation candidates: (c_cond, S, Hcond, coverage) ---
         cond_values = []
         for S in np.unique(S_i):
-            # Per-index statistic: j*-th smallest T_k among diagrams with size <= S
             Tstar = np.full(N, np.inf)
             for j in range(N):
                 Tk_ok = Tk[S_i[:, j] <= S, j]
@@ -103,9 +88,7 @@ def detect_solutions(weights, delta, alpha, kmax=5, n_best=100):
             continue
         cond = np.array(cond_values, dtype=float)
 
-        # --- Dispersion candidates for each m ---
         for m in range(k + 1, Smax + 1):
-            # Per-index statistic: j*-th largest p_m across realizations
             pstar = np.sort(compute_pm(m, weights), axis=0)[::-1][jstar - 1, :]
             c_cands = np.unique(np.round(pstar[pstar > 0], 3))
 
@@ -119,7 +102,6 @@ def detect_solutions(weights, delta, alpha, kmax=5, n_best=100):
                 continue
             disp = np.array(disp_values, dtype=float)
 
-            # --- Gap and score Gamma for every (c_disp, c_cond) pair ---
             Delta = disp[:, 1][:, None] - cond[:, 2][None, :]
             cov = disp[:, 2][:, None] * cond[:, 3][None, :]
             Gamma = np.where(Delta > 0, Delta / np.log(Smax) * cov, -np.inf)
@@ -135,9 +117,6 @@ def detect_solutions(weights, delta, alpha, kmax=5, n_best=100):
     return sorted(solutions, key=lambda s: s["Gamma"], reverse=True)[:n_best]
 
 
-# =====================================================================
-# 5. Phase classification
-# =====================================================================
 def distrib_from_solution(weights, sol):
     """Label (-1 dispersed, 0 undefined, +1 condensed) of one realization."""
     k, m, S = sol["k"], sol["m"], sol["S"]
@@ -170,9 +149,6 @@ def classify_phases(p_disp, p_cond, R, delta, alpha):
     return phase
 
 
-# =====================================================================
-# 6. Plot style and helpers
-# =====================================================================
 STYLE = {
     "font.size": 10, "axes.labelsize": 10, "axes.titlesize": 10,
     "legend.fontsize": 10, "xtick.labelsize": 10, "ytick.labelsize": 10,
@@ -188,7 +164,6 @@ def _frac_labels(symbol):
 
 
 def _set_xticks(ax, values):
-    """At most MAX_TICKS ticks, labelled with the parameter values."""
     idx = np.unique(np.linspace(0, len(values) - 1, min(MAX_TICKS, len(values)), dtype=int))
     ax.set_xticks(idx)
     ax.set_xticklabels([f"{values[i]:g}" for i in idx])
@@ -196,7 +171,6 @@ def _set_xticks(ax, values):
 
 
 def _finish(fig, filename):
-    """Save (format inferred from the extension) and show the figure."""
     if filename is not None:
         fig.savefig(filename, bbox_inches="tight")
     plt.show()
@@ -211,12 +185,11 @@ def plot_solution_probabilities(all_weights_test, best_solutions, delta, alpha,
     P = np.asarray(param_values)
     x = np.arange(len(P))
 
-    # Phase assigned by each solution at each index
     phases = np.array([
         classify_phases(*probabilities_from_solution(all_weights_test, s)[:2], R, delta, alpha)
         for s in best_solutions
     ])
-    # Fraction of solutions assigning each phase
+
     p_disp, p_ind, p_cond = (phases == -1).mean(0), (phases == 0).mean(0), (phases == 1).mean(0)
 
     lab = _frac_labels(param_symbol)
@@ -265,7 +238,6 @@ def plot_phase_detection(all_weights_test, solution, delta, alpha, entropies,
             3, 1, figsize=(6.2, 5.2), sharex=True,
             gridspec_kw={"height_ratios": [1.2, 2.5, 0.8], "hspace": 0.12})
 
-        # Top panel: fractions of realizations in each phase
         ax_f.plot(x, p_disp, color=COLORS[-1])
         ax_f.plot(x, p_cond, color=COLORS[1])
         ax_f.plot(x, p_ind, color="gray", linestyle="--")
@@ -273,7 +245,6 @@ def plot_phase_detection(all_weights_test, solution, delta, alpha, entropies,
         ax_f.set_ylim(-0.03, 1.03)
         ax_f.grid(alpha=0.25)
 
-        # Middle panel: persistent entropy with phases assigned
         for i in np.where(phase != 0)[0]:
             ax_e.axvspan(i - 0.5, i + 0.5, color=COLORS[phase[i]], alpha=0.40, linewidth=0)
         ax_e.plot(x, mean_pe, color="black")
@@ -281,7 +252,6 @@ def plot_phase_detection(all_weights_test, solution, delta, alpha, entropies,
         ax_e.set_ylabel(ylabel)
         ax_e.grid(alpha=0.25)
 
-        # Bottom panel: sensitivity to delta
         ax_p.imshow(phase_matrix, aspect="auto", interpolation="nearest", cmap=cmap, norm=norm,
                     extent=[-0.5, len(P) - 0.5, len(delta_values) - 0.5, -0.5])
         ax_p.set_yticks(np.arange(len(delta_values)))
@@ -289,7 +259,6 @@ def plot_phase_detection(all_weights_test, solution, delta, alpha, entropies,
         ax_p.set_xlabel(rf"${param_symbol}$")
         _set_xticks(ax_p, P)
 
-        # Single legend above the first panel
         handles = [
             Line2D([0], [0], color=COLORS[-1], label=lab["disp"]),
             Line2D([0], [0], color=COLORS[1], label=lab["cond"]),

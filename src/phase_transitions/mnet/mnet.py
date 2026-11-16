@@ -14,7 +14,7 @@ class MNet(nn.Module):
         Z=64,            # Number of neurons in fc1
         num_classes=10,  # Number of output classes
     ):
-        
+
         super().__init__()
 
         self.Y = Y
